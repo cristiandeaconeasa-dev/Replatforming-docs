@@ -9,6 +9,8 @@
 The Item Pipeline is the most critical data flow in the Replatforming program. It moves item data (prices, properties, status) from retail systems through the cloud platform and ultimately to ESL labels on store shelves.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph input["Item Sources"]
         ERP["Retailer ERP"]
@@ -288,6 +290,8 @@ But there's no check if "weight" or "promo" are valid properties for this store.
 Every item operation goes through a state machine:
 
 ```mermaid
+config:
+    layout: elk
 stateDiagram-v2
     [*] --> Received: Client sends request
     Received --> Validating: item-registry picks up
@@ -308,6 +312,8 @@ stateDiagram-v2
 
 **For deletions:**
 ```mermaid
+config:
+    layout: elk
 stateDiagram-v2
     [*] --> Received: Delete request
     Received --> Validating
@@ -485,6 +491,8 @@ Existing items are stored in per-store MySQL databases in R3Server. Moving them 
 ## 6. Current Item Pipeline Status
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     subgraph client["Client"]
         A["API Call"]
@@ -545,6 +553,8 @@ flowchart LR
 DTOflow has **no central orchestrator**. Each service subscribes to the DTO types it needs. When item-registry writes `storeitemvalues`, CQS fans out the notification to every subscriber in parallel:
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     IR[item-registry] -->|writes| SIV[("storeitemvalues.v1")]
     

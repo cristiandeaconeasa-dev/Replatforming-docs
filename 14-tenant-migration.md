@@ -17,6 +17,8 @@ Migration is **store-by-store**, not tenant-wide. Each store runs through the sa
 | **Switch** | Controlled cutover — R3Server becomes thin edge; DTOflow becomes authoritative | Brief window |
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     SM["Shadow Mode<br/>(days/weeks)"] --> VAL["Validation<br/>(automated + manual)"] --> SW["Switch<br/>(controlled cutover)"]
     SW --> LIVE["Live on DTOflow"]
@@ -53,6 +55,8 @@ Data is pushed to DTOflow by the CQS client running in R3Server (PLT-1870). The 
 ### 2.3 What DTOflow Does With Incoming Data
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     R3["R3Server<br/>(Shadow Mode enabled)"]
     SP[("Spanner 'dtoflow'")]
@@ -133,6 +137,8 @@ The switch from Shadow Mode to live DTOflow is a **controlled, sequenced cutover
 ### Step-by-step
 
 ```mermaid
+config:
+    layout: elk
 sequenceDiagram
     participant RT as Router/Ingress
     participant R3 as R3Server

@@ -13,6 +13,8 @@
 A tenant is **not** a GCP project, a Kubernetes namespace, or a single server. It is a **first‑class business entity** identified by a **`tenantUuid`**, owned by the **Tenant Service** (an EVO cloud service), and realized differently in each layer of the stack.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TD
     T["Tenant (retail chain)<br/>tenantUuid"] --> S1["Store A"]
     T --> S2["Store B"]
@@ -46,6 +48,8 @@ flowchart TD
 ## 3. What a tenant depends on
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     subgraph identity["Identity & resolution"]
         TS["Tenant Service (EVO)"] --> TUUID["tenantUuid"]
@@ -83,6 +87,8 @@ flowchart LR
 Tenancy is achieved by **physical separation**: each store is its own Store‑Unit with its own database, addressed by a tenant‑specific hostname.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     REQ["Client request + EVO token (tenant claim)"] --> RES["Resolve tenant → pcsInstance → store host"]
     RES --> ING["ingress-nginx (TLS SNI)"]
@@ -108,6 +114,8 @@ t/{tenantId}/s/{storeId}/{dtoType}/{id}
 Example: `t/abc-123-uuid/s/store-456/storeitemvalues/item-789`.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph spanner["Spanner 'dtoflow' (shared, 1000 PU)"]
         A["t/tenantA/s/store1/storeitemvalues/…"]

@@ -9,6 +9,8 @@
 The Link Pipeline manages **item-to-label associations** — determining which ESL labels are connected to which products, and triggering re-rendering when associations change. It sits between the Item Pipeline (item data) and the Rendering Pipeline (label images). Services subscribe to DTO changes independently — there is no central orchestrator.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     LR[link-registry]
     SESL[("storeesl.v1")]
@@ -81,6 +83,8 @@ flowchart TB
 A **link** is the association between an item (product) and an ESL label design. It answers the question: "which label design should this item display?"
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     ITEM["Item<br/>Product #123<br/>Price: $9.99"] --> LINK["LINK<br/>Associates item<br/>to label design"]
     LINK --> DESIGN["Label Design<br/>Template: price-tag<br/>Version: v2"]
@@ -370,6 +374,8 @@ ECC System ──→ Apigee ──→ link-registry ──→ Spanner (write lin
 How links connect items to rendered labels — the complete data model:
 
 ```mermaid
+config:
+    layout: elk
 erDiagram
     storeitemvalues ||--o{ link : "item has links"
     link ||--o| designerlink : "optional designer metadata"
@@ -474,6 +480,8 @@ Future:  Designer/Studio replaces ECC entirely
 ## 8. Link Pipeline vs Item Pipeline Dependencies
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph item["Item Pipeline (gated)"]
         IP["Item APIs<br/>PLT-2378"]

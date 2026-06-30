@@ -42,6 +42,8 @@ Read in order. Each document is self‑contained but builds on the previous one.
 ## The platform in one picture
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph store["🏬 In-store (edge)"]
         ESL["ESL labels<br/>(electronic shelf labels)"]

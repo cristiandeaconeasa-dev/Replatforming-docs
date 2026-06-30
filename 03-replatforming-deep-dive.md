@@ -15,6 +15,8 @@
 It is **not** a big‑bang rewrite. It is a **per‑API‑path migration**: one API surface at a time is re‑pointed from R3Server to a cloud service, validated, and cut over. R3Server is progressively "thinned" — it loses its database and most APIs, retaining only what must be physically near the labels.
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     subgraph before["Today: thick Store-Unit"]
         B1["R3Server: APIs + MySQL + render + transmit"]
@@ -44,6 +46,8 @@ flowchart LR
 DTOflow is the heart of the target platform: a standardized way for services to **publish, store, and react to** data as typed **DTOs**, instead of bespoke point‑to‑point integrations.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph dtoflow["DTOflow"]
         SRV["Per-DTO gRPC servers<br/>(auto-generated read/write APIs)"]
@@ -73,6 +77,8 @@ flowchart TB
 ### The DTO event flow (item update → label)
 
 ```mermaid
+config:
+    layout: elk
 sequenceDiagram
     participant SRC as Item source (R3Server shadow / cloud API)
     participant IR as item-registry(-api)
@@ -107,6 +113,8 @@ In **Shadow Mode** every step runs **except** the last `R3 → ESL` transmit —
 ## 3. The phase model
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     P0["Phase 0 — Shadow Mode<br/>internal Dev tenant<br/>validate pipeline, zero label risk"]
     P1["Phase 1 — First real tenant<br/>simple/basic features<br/>controlled risk"]
@@ -134,6 +142,8 @@ flowchart LR
 From **PLT‑2354** (Acceptance Criteria, live): *"Every time an item update gets committed to the database, make sure that within a reasonable amount of time it also gets published to DTOflow as `storeitemvalues` — ideally batch‑wise and without significantly loading the database by expensive polling."* The challenge is the **efficient export mechanism** (DB → cloud), not comparison logic.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     R3["R3Server commits item to MySQL"] --> EXP["Export storeitemvalues → DTOflow<br/>(CQS client in R3Server, PLT-1870)"]
     EXP --> PIPE["DTOflow pipeline runs fully<br/>(evaluate → render)"]
@@ -198,6 +208,8 @@ PLT‑2294 (id/alias validation), PLT‑2598 (initial bulk item load), PLT‑257
 ## 6. Epic dependency picture
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     PLT2118["PLT-2118 DTOflow PROD-ready (Test)"] --> SHADOW
     PLT169["PLT-169 CQS (In Progress)"] --> SHADOW

@@ -13,6 +13,8 @@
 **The DTOflow cloud platform is largely live.** Link processing, rendering, and transmission are operational end-to-end. The primary delivery risk is concentrated in the **Item Pipeline**, where property validation (PLT-2651) blocks item-driven flows, directly impacting Plaza Mobile and Central-Manager migrations.
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     DTOflow["DTOflow Foundation"] --> Link["Link Pipeline"]
     DTOflow --> Render["Rendering Pipeline"]

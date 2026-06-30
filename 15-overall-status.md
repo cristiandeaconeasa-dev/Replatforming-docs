@@ -18,6 +18,8 @@
 The Replatforming program spans 42 epics across 5 workstreams, 5 system capabilities, and 3 delivery phases. To make sense of this, we use a two-level hierarchy:
 
 ```mermaid
+config:
+    layout: elk
 
 flowchart TB
     subgraph phases["Three Delivery Phases"]
@@ -92,6 +94,8 @@ A single table (the two-level epic mapping in §4) combines all three dimensions
 ### Workstream Sequencing
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     W1["W1: Foundation<br/>Enablers"] --> W2["W2: Shadow<br/>Mode"]
     W2 --> W3["W3: Consumer<br/>API Cutover"]
@@ -297,6 +301,8 @@ All 21 services deployed and verified live.
 ### DTOflow cloud platform
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     DTOflow["DTOflow Foundation"] --> Link["Link Pipeline"]
     DTOflow --> Render["Rendering Pipeline"]

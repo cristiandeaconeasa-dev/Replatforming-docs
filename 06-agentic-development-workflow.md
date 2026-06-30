@@ -11,6 +11,8 @@
 ## Core philosophy
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     YOU["You talk to the agent<br/>in plain language"] --> AGENT["Agent reads the ticket,<br/>gathers context, auto-selects<br/>skill and persona"]
     AGENT --> CONFIDENCE{"You have confidence<br/>the agent has accurate<br/>context and understanding?"}
@@ -119,6 +121,8 @@ agy                       # launch the agent  ·  or  cc  for Claude Code
 ## The development workflow: 00 → 09
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph boot["Boot"]
         BC["hive connect → cd <repo> → agy"]
@@ -224,6 +228,8 @@ Three escalating documents, each reviewed by the architect before the next begin
 ### 03.5 — Approve the plan
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     PLAN["Implementation Plan ready"] --> DECIDE{"Blast radius?"}
     DECIDE -->|"Low risk, well-understood"| A["Path A: Self-approve"]
@@ -463,6 +469,8 @@ When working outside the container, equivalent access typically comes from confi
 ## The memory cadence
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     subgraph Capture["Capture — every sub-task"]
         MD["/mini-dream<br/>while fresh"]
@@ -524,6 +532,8 @@ Source: `bin/gclean` → `build-helpers.sh` `gclean()` (line 620).
 ### The two paths
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph before["Before BEEP — Traditional flow"]
         direction TB

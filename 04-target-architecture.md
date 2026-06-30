@@ -15,6 +15,8 @@
 The end state is a **hybrid cloud‑edge** system: a shared multi‑tenant cloud platform for data/APIs/rendering, and a **thin** Pricer Server at each store for radio transmission only.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     ERP["Retailer ERP"]
     subgraph clients["Clients"]
@@ -80,6 +82,8 @@ Two complementary entry points; the key migration mechanism is **per‑API‑pat
 The existing **PCS ingress‑nginx** is taught to route by URL path instead of always hitting the Store‑Unit:
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     REQ["Request to {store}.{pcsInstance}.pcm.pricer-plaza.com/api/..."] --> ING{"ingress-nginx<br/>path match"}
     ING -->|"/api/.../items/*"| CLOUD["Cloud: item-registry-api → DTOflow"]
@@ -109,6 +113,8 @@ This is what makes the migration **incremental and reversible**: flip one path t
 Because the **physics live in the store**. Driving IR/RF radios and getting a label to change in milliseconds requires code **on the LAN, next to the basestations**. The cloud cannot meet that latency or own that hardware. So R3Server remains as a **thin edge agent**.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph cloudside["☁️ Cloud owns"]
         D1["Item & link storage (Spanner)"]
@@ -141,6 +147,8 @@ flowchart TB
 ## 4. End‑to‑end in the target (item update → label)
 
 ```mermaid
+config:
+    layout: elk
 sequenceDiagram
     participant ERP as ERP / Plaza Mobile
     participant ING as ingress / Apigee

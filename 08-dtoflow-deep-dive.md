@@ -11,6 +11,8 @@
 DTOflow is a **typed data platform** built on GCP. Services write typed DTOs to Spanner, changes are published as typed events on Pub/Sub, and the ChangeQueueService (CQS) delivers events to subscribing services. The pattern is **state → event → react**: services own their state, communicate through events, and downstream services react asynchronously.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph clients["Writers / Readers"]
         IR["item-registry-api"]
@@ -159,6 +161,8 @@ Each DTO type gets its own change topic. When a record is written or updated in 
 CQS is the **subscription-based fan-out layer** that bridges Pub/Sub events to downstream service reactions. CQS has **no routing logic of its own** — each service declares its own subscriptions at startup via `CreateOrConfigureQueue`. CQS simply delivers notifications to whichever queues subscribed to a given DTO type.
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     subgraph input["Input"]
         PS[("Pub/Sub<br/>Change Events")]
@@ -201,6 +205,8 @@ Each service **owns its own CQS queue** (PLT-2792, Bart De Boer — In Progress)
 All 21 Cloud Run services in `europe-north1`:
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph legend["Legend"]
         L1["🟢 Live"]
@@ -317,6 +323,8 @@ These clients abstract the DTO serialization/deserialization and provide type-sa
 This is the flow that exercises the most DTOflow components:
 
 ```mermaid
+config:
+    layout: elk
 sequenceDiagram
     participant Client as Client (ERP/Plaza Mobile)
     participant IRA as item-registry-api
@@ -367,6 +375,8 @@ sequenceDiagram
 ## 7. DTOflow Spanner Table Relationships (Entity Model)
 
 ```mermaid
+config:
+    layout: elk
 erDiagram
     storeitemvalues ||--o{ link : "item has links"
     link ||--o{ designerlink : "can be designer link"
@@ -394,6 +404,8 @@ erDiagram
 ## 8. Pub/Sub Event-Driven Topology
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     subgraph producers["Event Producers"]
         IRA["item-registry-api"]

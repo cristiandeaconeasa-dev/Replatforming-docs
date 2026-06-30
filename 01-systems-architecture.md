@@ -11,6 +11,8 @@
 Pricer sells an **Electronic Shelf Label (ESL)** platform to retail chains. A price change in the retailer's ERP must end up on thousands of e‑paper labels on the shelves, correctly and within seconds. The platform is layered:
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     ERP["Retailer ERP / back-office"]
 
@@ -68,6 +70,8 @@ The physical layer is what makes Pricer special and is the part that **cannot** 
 The transmission path inside R3Server (all under [pricer-server-r3server/R3Server/.../infrastructure/](../../pricer-server-r3server)):
 
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     API["REST request<br/>(flash / display-page / link)"] --> Q["Request queue<br/>(priority levels)"]
     Q --> ENG["TransmissionEngineManager<br/>+ TransmissionEngineFactory"]
@@ -134,6 +138,8 @@ These are the surfaces the consumer apps actually call:
 R3Server is **not bare metal** in PCS. Each store is a containerized **Store‑Unit**:
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph gke["GKE cluster"]
         ING["ingress-nginx<br/>TLS SNI: {store}.{pcsInstance}.pcm.pricer-plaza.com"]
@@ -157,6 +163,8 @@ flowchart TB
 Pricer's product has **three consumer systems** ("heads of the snake"), plus Plaza Actions. Each calls a different mix of backends.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph h1["Head 1 — Plaza Mobile"]
         APP1["React Native app"] --> BFF["Koa BFF (Cloud Run)"]
@@ -231,6 +239,8 @@ Most of these map 1:1 to GitHub repos in the `PricerAB` org (e.g. `platform-item
 ## 6. End‑to‑end: a price change today
 
 ```mermaid
+config:
+    layout: elk
 sequenceDiagram
     participant ERP as Retailer ERP
     participant ING as PCS ingress

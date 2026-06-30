@@ -46,6 +46,8 @@ Note that `studio-renderer` and `studio-link-evaluator` **both** subscribe to `s
 This is the most common flow. Both evaluator and renderer are triggered in parallel. The evaluator may or may not produce a new `studiolink` — if it doesn't, the renderer still renders with the existing link + new item values. If the evaluator *does* produce a new studiolink, the renderer gets a second trigger and may do double work (render the old design, then render the new design).
 
 ```mermaid
+config:
+    layout: elk
 flowchart TD
     IR[item-registry] -->|writes| SIV[("storeitemvalues.v1")]
     
@@ -95,6 +97,8 @@ flowchart TD
 **Trigger:** `item-registry` writes `storeitemvalues` for an item linked to an ECC label.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TD
     IR[item-registry] -->|writes| SIV[("storeitemvalues.v1")]
     
@@ -134,6 +138,8 @@ flowchart TD
 **Trigger:** `link-registry` creates a new `link.v2` with a Studio variant (`Single` or `FloatingCanvas`).
 
 ```mermaid
+config:
+    layout: elk
 flowchart TD
     LR[link-registry] -->|writes| SESL[("storeesl.v1")]
     LR -->|writes| LV2[("link.v2")]
@@ -179,6 +185,8 @@ flowchart TD
 **Trigger:** `link-registry` creates a `link.v2` with an ECC variant (`EccSingle` or `MultiItem`).
 
 ```mermaid
+config:
+    layout: elk
 flowchart TD
     LR[link-registry] -->|writes| SESL[("storeesl.v1")]
     LR -->|writes| LV2[("link.v2")]
@@ -225,6 +233,8 @@ flowchart TD
 This is the heavy fan-out case. A single design change may affect every linked ESL across a multi-store tenant. The `ReEnqueue` streaming API is used to split the work into manageable batches.
 
 ```mermaid
+config:
+    layout: elk
 flowchart TD
     SDL[studio-design-library] -->|writes| DSN[("design.v1")]
     

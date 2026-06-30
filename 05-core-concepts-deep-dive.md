@@ -11,6 +11,8 @@
 ## 1. The big picture: how these concepts fit together
 
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph Tenant["🏪 Tenant (Customer)"]
         T_UUID["tenantUuid: UUID"]
@@ -115,6 +117,8 @@ CREATE TABLE link (
 
 ### 3.3 The two linking systems ✅
 ```mermaid
+config:
+    layout: elk
 flowchart TB
     subgraph ECC["💾 ECC linking (legacy)"]
         E1["BFF route: POST .../labels/link-single"]
@@ -171,6 +175,8 @@ A **JWT issued by Auth0** (the EVO auth platform) that authenticates a user and 
 
 ### 4.2 Flow
 ```mermaid
+config:
+    layout: elk
 sequenceDiagram
     participant User
     participant Auth0
@@ -243,6 +249,8 @@ A **PCS instance** identifies a specific **Pricer Central Solution** deployment 
 
 ### 5.2 How it's resolved ✅
 ```mermaid
+config:
+    layout: elk
 flowchart LR
     BFF["BFF get-pcs-id"] -->|GET /api/v1/tenants/{tenant}/services| TS["plaza-tenants"]
     TS -->|services[type='central manager'].configuration.pcsId| BFF
@@ -270,6 +278,8 @@ Today the relationship is effectively **1 tenant → 1 PCS instance**. In the DT
 
 ### Today
 ```mermaid
+config:
+    layout: elk
 sequenceDiagram
     participant User as Store Associate
     participant Auth0
@@ -290,6 +300,8 @@ sequenceDiagram
 
 ### DTOflow target
 ```mermaid
+config:
+    layout: elk
 sequenceDiagram
     participant User
     participant BFF
