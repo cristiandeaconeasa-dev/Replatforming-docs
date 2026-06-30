@@ -1,0 +1,1005 @@
+<title>Beep Sandbox — The Agentic Development Workflow</title>
+<style>
+  :root {
+    --ground:   #0E1F22;
+    --ground-2: #132B2C;
+    --ground-3: #173433;
+    --text:     #E7EEEB;
+    --muted:    #8FA5A2;
+    --faint:    #6A807E;
+    --line:     #264241;
+    --accent:   #F2A93B;
+    --accent-dim: rgba(242,169,59,0.14);
+    --human:    #5FBEA9;
+    --human-dim: rgba(95,190,169,0.12);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  .wrap { width: 100%; max-width: 920px; margin: 0 auto; padding: 0 28px; }
+  a { color: var(--accent); }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.32em;
+    text-transform: uppercase; color: var(--accent); margin: 0;
+  }
+
+  .hero {
+    position: relative; padding: 72px 0 56px;
+    border-bottom: 1px solid var(--line); overflow: hidden;
+  }
+  #hex { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; }
+  .hero .wrap { position: relative; z-index: 1; }
+
+  .hero h1 {
+    font-family: var(--sans); font-weight: 800;
+    font-size: clamp(36px, 6.5vw, 64px); line-height: 1.02;
+    letter-spacing: -0.025em; margin: 18px 0 0; max-width: 14ch;
+  }
+  .hero h1 .amber { color: var(--accent); }
+  .hero .lede {
+    color: var(--muted); font-size: clamp(16px, 2vw, 19px);
+    max-width: 56ch; margin: 22px 0 0;
+  }
+  .hero .who {
+    font-family: var(--mono); font-size: 13px;
+    color: var(--faint); margin-top: 20px; letter-spacing: 0.02em;
+  }
+
+  .demo {
+    margin-top: 36px; background: var(--ground-2);
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 22px; max-width: 640px;
+  }
+  .demo .say {
+    font-family: var(--mono); font-size: 14px; color: var(--human);
+    display: flex; gap: 9px; align-items: baseline;
+  }
+  .demo .say .prompt { color: var(--accent); font-weight: 700; }
+  .caret {
+    display: inline-block; width: 9px; height: 1.05em;
+    background: var(--human); transform: translateY(2px);
+    margin-left: 2px; animation: blink 1.1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .demo .arrow {
+    font-family: var(--mono); font-size: 12px; color: var(--faint);
+    letter-spacing: 0.15em; margin: 12px 0 10px; text-transform: uppercase;
+  }
+  .demo .runs { display: flex; flex-wrap: wrap; gap: 7px; }
+
+  .section { padding: 60px 0; border-bottom: 1px solid var(--line); }
+  .section-head { margin-bottom: 32px; }
+  .section-head h2 {
+    font-size: clamp(24px, 3.5vw, 32px); font-weight: 750;
+    letter-spacing: -0.02em; margin: 10px 0 0;
+  }
+
+  .layers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .layer {
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 24px 22px; background: var(--ground-2);
+  }
+  .layer .tag {
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.22em; text-transform: uppercase;
+  }
+  .layer.talk { border-top: 3px solid var(--human); }
+  .layer.talk .tag { color: var(--human); }
+  .layer.skill { border-top: 3px solid var(--accent); }
+  .layer.skill .tag { color: var(--accent); }
+  .layer h3 { margin: 8px 0 6px; font-size: 19px; font-weight: 700; }
+  .layer p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .ruleofthumb {
+    margin-top: 20px; display: flex; gap: 12px; align-items: flex-start;
+    background: var(--accent-dim); border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0; padding: 16px 20px;
+  }
+  .ruleofthumb .k {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--accent); white-space: nowrap; padding-top: 2px;
+  }
+  .ruleofthumb p { margin: 0; font-size: 15px; }
+
+  .phase { display: grid; grid-template-columns: 60px 1fr; gap: 18px; padding-bottom: 12px; }
+  .rail { position: relative; }
+  .rail::before {
+    content: ""; position: absolute; left: 50%; top: 0; bottom: -12px;
+    width: 2px; background: var(--line); transform: translateX(-50%);
+  }
+  .phase:last-of-type .rail::before { bottom: auto; height: 26px; }
+
+  .hexnum {
+    position: relative; width: 48px; height: 54px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+    display: grid; place-items: center; margin: 4px auto 0; z-index: 1;
+  }
+  .hexnum::before {
+    content: ""; position: absolute; inset: 2px; background: var(--ground);
+    clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  }
+  .hexnum span { position: relative; z-index: 1; font-family: var(--mono); font-weight: 700; font-size: 16px; color: var(--accent); }
+
+  .pcard {
+    background: var(--ground-2); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px 22px 22px;
+  }
+  .pcard h3 { margin: 0 0 3px; font-size: 20px; font-weight: 720; letter-spacing: -0.01em; }
+  .pcard .blurb { margin: 0 0 14px; color: var(--muted); font-size: 14.5px; }
+
+  .say-line {
+    font-family: var(--mono); font-size: 13.5px; color: var(--human);
+    background: var(--human-dim); border-left: 2px solid var(--human);
+    border-radius: 0 8px 8px 0; padding: 10px 14px;
+    margin: 0 0 8px; display: flex; gap: 8px;
+  }
+  .say-line .prompt { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+  .runs-label, .meta-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 7px;
+  }
+  .runs { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+
+  .pill {
+    font-family: var(--mono); font-size: 12px; padding: 4px 10px;
+    border-radius: 999px; border: 1px solid var(--line);
+    color: var(--muted); white-space: nowrap;
+  }
+  .pill.skill { color: var(--accent); border-color: rgba(242,169,59,0.45); background: var(--accent-dim); }
+  .pill.tool  { color: var(--muted); }
+
+  .persona-line { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .persona {
+    font-family: var(--mono); font-size: 11.5px; color: var(--human);
+    border: 1px dashed rgba(95,190,169,0.4); border-radius: 999px; padding: 3px 10px;
+  }
+
+  .gate {
+    margin-top: 14px; display: flex; gap: 10px; align-items: flex-start;
+    background: rgba(242,169,59,0.08); border: 1px solid rgba(242,169,59,0.32);
+    border-radius: 10px; padding: 11px 14px;
+  }
+  .gate .diamond { color: var(--accent); font-size: 13px; padding-top: 2px; }
+  .gate .gtext { font-size: 14px; }
+  .gate .gtext b { color: var(--accent); font-weight: 700; letter-spacing: 0.04em; }
+
+  .flow-note {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--ground-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 16px; margin: -14px 0 30px; font-size: 13.5px; color: var(--muted);
+  }
+  .flow-note .jdot { width: 9px; height: 9px; border-radius: 3px; background: var(--accent); flex-shrink: 0; margin-top: 5px; }
+  .flow-note b { color: var(--text); font-weight: 600; }
+
+  .boot-lead { color: var(--muted); font-size: 15px; max-width: 60ch; margin: 0 0 16px; }
+  .term {
+    background: #0A1618; border: 1px solid var(--line);
+    border-radius: 12px; overflow: hidden; margin-bottom: 26px;
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 14px; background: var(--ground-2); border-bottom: 1px solid var(--line);
+  }
+  .term-bar .dot { width: 9px; height: 9px; border-radius: 50%; background: transparent; border: 1px solid var(--line); }
+  .term-bar .dot.lit { background: var(--accent-dim); border-color: rgba(242,169,59,0.4); }
+  .term-bar .tlabel { margin-left: 7px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
+  .term-body { padding: 18px 20px; font-family: var(--mono); font-size: 13.5px; line-height: 1.5; }
+  .term-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; padding: 4px 0; }
+  .term-row .pr { color: var(--accent); font-weight: 700; }
+  .term-row .cmd { color: var(--text); }
+  .term-row .cmt { color: var(--faint); margin-left: auto; }
+
+  .jira-move {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 12px;
+    background: var(--ground-3); border: 1px solid rgba(242,169,59,0.3);
+    border-radius: 8px; padding: 8px 13px; margin-top: 14px;
+  }
+  .jira-move .jlabel { color: var(--faint); letter-spacing: 0.16em; text-transform: uppercase; font-size: 9px; border-right: 1px solid var(--line); padding-right: 10px; }
+  .jira-move .from { color: var(--muted); }
+  .jira-move .ar { color: var(--faint); }
+  .jira-move .to { color: var(--accent); font-weight: 700; }
+
+  .fork { margin: 4px 0 20px; padding: 3px 0 0 80px; }
+  .fork-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .fork-badge { font-family: var(--mono); font-weight: 700; font-size: 13px; color: var(--ground); background: var(--accent); border-radius: 999px; padding: 3px 12px; letter-spacing: 0.04em; }
+  .fork-head h3 { margin: 0; font-size: 18px; font-weight: 720; }
+  .fork-head .missing { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--human); border: 1px solid rgba(95,190,169,0.4); border-radius: 999px; padding: 2px 9px; }
+  .paths { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .path { border: 1px solid var(--line); border-radius: 12px; padding: 20px; background: var(--ground-2); }
+  .path .ph { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .path h4 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+  .path p { margin: 0; color: var(--muted); font-size: 14px; }
+  .converge { margin-top: 14px; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: 0.06em; }
+  .converge b { color: var(--text); font-weight: 600; }
+
+  .hatch-card {
+    background: linear-gradient(180deg, var(--ground-3), var(--ground-2));
+    border: 1px solid var(--line); border-radius: 14px; padding: 28px 28px;
+  }
+  .hatch-card p { color: var(--muted); margin: 0 0 16px; max-width: 64ch; }
+  .hatch-card .runs { margin-top: 3px; }
+
+  .mem-tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .tier { border: 1px solid var(--line); border-radius: 12px; padding: 20px 20px 22px; background: var(--ground-2); position: relative; }
+  .tier.key { border-color: rgba(242,169,59,0.45); background: var(--accent-dim); }
+  .tier .freq { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
+  .tier.key .freq { color: var(--accent); }
+  .tier h4 { margin: 10px 0 6px; font-size: 16px; font-weight: 700; }
+  .tier p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  .tier .verb { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--human); display: block; margin-bottom: 5px; }
+  .mem-note { margin-top: 18px; display: flex; gap: 10px; align-items: flex-start; background: rgba(95,190,169,0.08); border-left: 3px solid var(--human); border-radius: 0 10px 10px 0; padding: 13px 16px; }
+  .mem-note .ic { color: var(--human); padding-top: 1px; }
+  .mem-note p { margin: 0; font-size: 14px; color: var(--text); }
+  .mem-note code { color: var(--accent); }
+
+  .notes { display: grid; gap: 14px; }
+  .note { display: grid; grid-template-columns: 36px 1fr; gap: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; background: var(--ground-2); }
+  .note .n { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--accent); }
+  .note h4 { margin: 0 0 5px; font-size: 16px; font-weight: 700; }
+  .note p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  footer { padding: 40px 0 56px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: 0.04em; }
+
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.55s ease, transform 0.55s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 720px) {
+    body { font-size: 16px; }
+    .layers-grid { grid-template-columns: 1fr; }
+    .paths { grid-template-columns: 1fr; }
+    .mem-tiers { grid-template-columns: 1fr; }
+    .phase { grid-template-columns: 48px 1fr; gap: 12px; }
+    .hexnum { width: 40px; height: 46px; }
+    .hexnum span { font-size: 14px; }
+    .fork { padding-left: 0; }
+    .demo .say { flex-wrap: wrap; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .caret { animation: none; }
+  }
+</style>
+
+<section class="hero">
+  <canvas id="hex"></canvas>
+  <div class="wrap">
+    <p class="eyebrow">Beep Sandbox · Engineering Workflow</p>
+    <h1>Talk first. The skills fire <span class="amber">underneath.</span></h1>
+    <p class="lede">A beginner's map of how we build with agents in the sandbox. You hold a conversation about the ticket; the agent recognises which skill or persona the moment calls for and runs it. This guide spells out both layers — so you know the vocabulary, and know when to take the wheel.</p>
+    <p class="who">For: engineers new to the Beep Sandbox &nbsp;·&nbsp; Engine: Claude Code (cc) or Antigravity (agy) — identical skills on either</p>
+
+    <div class="demo">
+      <div class="say"><span class="prompt">&rsaquo;</span><span>"read PLT-1234 and tell me what we're actually building"<span class="caret"></span></span></div>
+      <div class="arrow">— the agent quietly runs —</div>
+      <div class="runs">
+        <span class="pill tool">jira-proxy get-issue</span>
+        <span class="pill skill">/memory-recall</span>
+        <span class="pill skill">/ask</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">How to read this</p>
+      <h2>Two layers, one conversation</h2>
+    </div>
+    <div class="layers-grid">
+      <div class="layer talk reveal">
+        <span class="tag">The layer you live in</span>
+        <h3>The conversation</h3>
+        <p>You talk to the agent in plain language. *"Read PLT-1234 and tell me what we're doing."* The agent reads the ticket, gathers context, and figures out which skills or personas to invoke. If its understanding isn't accurate, you refine — you point to related tickets, share Confluence pages, clarify. You almost never type a slash-command directly.</p>
+      </div>
+      <div class="layer skill reveal">
+        <span class="tag">What happens underneath</span>
+        <h3>The skills & personas</h3>
+        <p>Every stage below maps to a concrete skill and a persona. The agent picks the right one based on your conversation. We name them here so you can learn the map, and force a stage by hand with a `/command` when the agent guesses wrong.</p>
+      </div>
+    </div>
+    <div class="ruleofthumb reveal">
+      <span class="k">Rule of thumb</span>
+      <p>Lead with conversation. Reach for the explicit <code>/command</code> only when you want to force a stage, the agent skipped one, or you're still learning the map.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">The spine · 00 → 09</p>
+      <h2>The development workflow</h2>
+    </div>
+
+    <p class="boot-lead reveal">It starts in your terminal — connect to the hive, move into the project, launch the engine. Everything after that is conversation.</p>
+    <div class="term reveal">
+      <div class="term-bar">
+        <span class="dot lit"></span><span class="dot"></span><span class="dot"></span>
+        <span class="tlabel">before the conversation</span>
+      </div>
+      <div class="term-body">
+        <div class="term-row"><span class="pr">$</span><span class="cmd">hive connect</span><span class="cmt"># join the sandbox hive</span></div>
+        <div class="term-row"><span class="pr">$</span><span class="cmd">cd projects/<project></span><span class="cmt"># into the repo you're working in</span></div>
+        <div class="term-row"><span class="pr">$</span><span class="cmd">agy</span><span class="cmt"># launch the agent  ·  or  cc  for Claude Code</span></div>
+      </div>
+    </div>
+
+    <p class="flow-note reveal"><span class="jdot"></span><span>Two phases double as Jira state changes — shown here for a <b>TODO → In Progress → Code Review</b> board. Boards differ per team; the agent reads the live transitions for the ticket rather than hard-coding any IDs.</span></p>
+
+    <!-- 00 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>00</span></div></div>
+      <div class="pcard">
+        <h3>Pick up the ticket</h3>
+        <p class="blurb">With the agent running, start work on the ticket and branch off fresh <code>main</code> — never work on it directly. Three ways to start — pick the phrasing that fits you.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Have a look at PLT-1234"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Start work on PLT-1234 for me"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"I need to pick up PLT-1234"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/start-issue</span>
+          <span class="pill skill">/jira-workflow</span>
+          <span class="pill tool">new-branch</span>
+          <span class="pill tool">jira-proxy do-transition</span>
+        </div>
+        <div class="jira-move">
+          <span class="jlabel">Ticket</span>
+          <span class="from">TODO</span>
+          <span class="ar">&rarr;</span>
+          <span class="to">In Progress</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 01 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>01</span></div></div>
+      <div class="pcard">
+        <h3>Orient on the ticket</h3>
+        <p class="blurb">Point at the ticket and ask the agent to index and understand — not act yet.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Read the ticket and tell me what we're doing — don't touch anything yet"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Give me a quick overview of PLT-1234"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Summarise what this ticket is about"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill tool">jira-proxy get-issue</span>
+          <span class="pill skill">/memory-recall</span>
+          <span class="pill skill">/ask</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>02</span></div></div>
+      <div class="pcard">
+        <h3>Finalise complete context</h3>
+        <p class="blurb">Pull from every source until the picture is whole: indexed repos, Atlassian, and live GCP state.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Cross-check the Confluence design and the live deployment before we plan"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Read through all linked resources — I want the full picture"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Dig into this: related repos, docs, and what's running right now"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill tool">Atlassian (Jira · Confluence)</span>
+          <span class="pill skill">/gcp-k8s-troubleshoot</span>
+          <span class="pill skill">/grill-with-docs</span>
+          <span class="pill skill">/grill-me</span>
+        </div>
+        <div class="gate">
+          <span class="diamond">&#9670;</span>
+          <span class="gtext"><b>Gate.</b> Context must be complete and agreed before a single document is written. This is where beginners under-invest — and the whole plan inherits the gap.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>03</span></div></div>
+      <div class="pcard">
+        <h3>Define the work — brief → spec → plan</h3>
+        <p class="blurb">Three escalating documents, each reviewed by the architect before the next begins. The output is an approved Implementation Plan.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Draft a brief, turn it into a spec, then break it into a phased plan — have the architect review each step"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Let's architect a solution — start with a brief and work up to a plan"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"I need a spec and implementation plan for this"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/create-spec</span>
+          <span class="pill skill">/create-plan</span>
+          <span class="pill skill">/review-doc</span>
+        </div>
+        <div class="persona-line">
+          <span class="meta-label" style="margin:0;">Personas</span>
+          <span class="persona">product-analyst</span>
+          <span class="persona">architect</span>
+        </div>
+        <div class="gate">
+          <span class="diamond">&#9670;</span>
+          <span class="gtext"><b>Hard stop.</b> The agent must pause and ask you about anything unclear before finalising — never let it paper over ambiguity.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORK 03.5 -->
+    <div class="fork reveal">
+      <div class="fork-head">
+        <span class="fork-badge">03.5</span>
+        <h3>Approve the plan</h3>
+        <span class="missing">the fork to make explicit</span>
+      </div>
+      <div class="paths">
+        <div class="path">
+          <div class="ph">Path A</div>
+          <h4>Self-approve</h4>
+          <p>You read and accept the plan yourself, then go straight to implementation. The fast path for well-understood, contained work.</p>
+        </div>
+        <div class="path">
+          <div class="ph">Path B</div>
+          <h4>Human peer review</h4>
+          <p>You route the plan to a colleague for review first, fold in their feedback, then proceed. For higher-risk, cross-cutting, or unfamiliar work.</p>
+        </div>
+      </div>
+      <div class="converge">&darr; &nbsp; both paths converge on <b>Phase 04</b> &nbsp; · &nbsp; pick by blast radius and your own confidence</div>
+    </div>
+
+    <!-- 04 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>04</span></div></div>
+      <div class="pcard">
+        <h3>Implement, test-first</h3>
+        <p class="blurb">Design the tests before the implementation — TDD is mandatory. Define behaviour with a failing test, then build the plan phase by phase.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Design the test plan first, then implement phase 1"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Write tests first, then build it — TDD for phase 1"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Start implementing — tests before code"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/design-tests</span>
+          <span class="pill skill">/implement</span>
+        </div>
+        <div class="persona-line">
+          <span class="meta-label" style="margin:0;">Personas</span>
+          <span class="persona">tester</span>
+          <span class="persona">security-reviewer (auto, on sensitive diffs)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 05 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>05</span></div></div>
+      <div class="pcard">
+        <h3>Green the tests</h3>
+        <p class="blurb">Run the tests and fix until everything passes. Not done until the new tests and the full suite are green.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Run the tests and fix issues until they all pass"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Make sure everything is green"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Verify the build and run all tests"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/verify</span>
+          <span class="pill skill">/coverage</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 06 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>06</span></div></div>
+      <div class="pcard">
+        <h3>Commit, push, PR</h3>
+        <p class="blurb">Approve the commit, push the branch, open the PR. Conventional Commits; <code>Closes #ID</code> in the body; push the explicit branch name.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Commit this, push, and open the PR"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"I'm happy with it — push it up and open a PR"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Let's get this reviewed — open a PR"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/changelog</span>
+          <span class="pill skill">/jira-workflow</span>
+          <span class="pill tool">jira-proxy do-transition</span>
+        </div>
+        <div class="jira-move">
+          <span class="jlabel">Ticket</span>
+          <span class="from">In Progress</span>
+          <span class="ar">&rarr;</span>
+          <span class="to">Code Review</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 07 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>07</span></div></div>
+      <div class="pcard">
+        <h3>Rewrite history</h3>
+        <p class="blurb">After a while on a branch, clean the commits into logical, reviewable units. Verifies parity with the original tree.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Rewrite the history into clean logical commits"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Clean up the commit history before we merge"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Rebase and squash into meaningful commits"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/rewrite-history</span>
+        </div>
+        <div class="gate">
+          <span class="diamond">&#9670;</span>
+          <span class="gtext">Force-push is blocked in-sandbox — push a fresh branch, or have a human do the force-push externally.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 08 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>08</span></div></div>
+      <div class="pcard">
+        <h3>PR feedback loop</h3>
+        <p class="blurb">Have the agent read what others and the bots left, act on it, and re-request review. Always resolve the thread once the fix is committed.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Read the review comments, address them, then re-request review"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Check the PR feedback and work through it"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Go through the comments, fix what needs fixing, and re-request"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/resolve-copilot-comments</span>
+          <span class="pill skill">/resolve-wiz-findings</span>
+          <span class="pill skill">/review-change</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 08.5 NEW -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>08.5</span></div></div>
+      <div class="pcard">
+        <h3>Capture what you learned</h3>
+        <p class="blurb">Before closing out, crystallise the key insight from this work. This feeds the memory cadence and makes future similar tasks faster for everyone.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Crystallise what we learned from this"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Save the key insights — I want to remember this next time"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Capture takeaways before we close out"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/memory-dream</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 09 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>09</span></div></div>
+      <div class="pcard">
+        <h3>Approved & merged</h3>
+        <p class="blurb">PR reviewed and approved. Merge is Rebase Merge for linear history — and in-sandbox the human performs the merge. Then capture what you learned.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Archive the plan and refresh the docs"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Merge and close out — then archive"</span></div>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Merge it, archive the plan, update the docs"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/archive-plan</span>
+          <span class="pill skill">/refresh-docs</span>
+          <span class="pill skill">/mini-dream</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Once you trust the loop</p>
+      <h2>The escape hatch</h2>
+    </div>
+    <div class="hatch-card reveal">
+      <p>For low-risk, well-scoped work, the whole chain — brief &rarr; spec &rarr; plan &rarr; implement &rarr; verify &rarr; archive — collapses into one autonomous run. Mention it to beginners as the thing you <em>graduate</em> to, not the default you start with.</p>
+      <div class="runs">
+        <span class="pill skill">/beep-it</span>
+        <span class="pill skill">/auto-implement</span>
+      </div>
+      <p style="margin-top:16px; font-size:13.5px; color:var(--faint);"><code>/beep-it</code> auto-approves the gates end-to-end. <code>/auto-implement</code> runs uninterrupted on edits and local commits — still blocked from push, PR, and Jira.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Closing the loop</p>
+      <h2>The memory cadence</h2>
+    </div>
+    <div class="mem-tiers">
+      <div class="tier reveal">
+        <span class="freq">Every sub-task</span>
+        <h4>Capture</h4>
+        <p><span class="verb">while fresh</span>Crystallise a technical insight the moment a sub-task lands. This is the <code>/mini-dream</code> folded into Phase 09 — high frequency, low ceremony.</p>
+        <div class="runs"><span class="pill skill">/mini-dream</span></div>
+      </div>
+      <div class="tier key reveal">
+        <span class="freq">Between 08.5 and 09 · manual</span>
+        <h4>Promote</h4>
+      </div>
+      <div class="term-body">
+        <div class="term-row"><span class="pr">$</span><span class="cmd">hive connect</span><span class="cmt"># join the sandbox hive</span></div>
+        <div class="term-row"><span class="pr">$</span><span class="cmd">cd projects/&lt;project&gt;</span><span class="cmt"># into the repo you're working in</span></div>
+        <div class="term-row"><span class="pr">$</span><span class="cmd">agy</span><span class="cmt"># launch the agent  ·  or  cc  for Claude Code</span></div>
+      </div>
+    </div>
+
+    <p class="flow-note reveal"><span class="jdot"></span><span>Two phases double as Jira state changes — shown here for a <b>TODO &rarr; In Progress &rarr; Code Review</b> board. Boards differ per team; the agent reads the live transitions for the ticket rather than hard-coding any IDs.</span></p>
+
+    <!-- 00 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>00</span></div></div>
+      <div class="pcard">
+        <h3>Pick up the ticket</h3>
+        <p class="blurb">With the agent running, start work on the ticket and branch off fresh <code>main</code> — never work on it directly.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"Have a look at PLT-1234"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/start-issue</span>
+          <span class="pill skill">/jira-workflow</span>
+          <span class="pill tool">new-branch</span>
+          <span class="pill tool">jira-proxy do-transition</span>
+        </div>
+        <div class="jira-move">
+          <span class="jlabel">Ticket</span>
+          <span class="from">TODO</span>
+          <span class="ar">&rarr;</span>
+          <span class="to">In Progress</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 01 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>01</span></div></div>
+      <div class="pcard">
+        <h3>Orient on the ticket</h3>
+        <p class="blurb">Point at the ticket and ask the agent to index and understand — not act yet.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"read the ticket and tell me what we're doing — don't touch anything yet"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill tool">jira-proxy get-issue</span>
+          <span class="pill skill">/memory-recall</span>
+          <span class="pill skill">/ask</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>02</span></div></div>
+      <div class="pcard">
+        <h3>Finalise complete context</h3>
+        <p class="blurb">Pull from every source until the picture is whole: indexed repos, Atlassian, and live GCP state.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"cross-check the Confluence design and the live deployment before we plan"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill tool">Atlassian (Jira · Confluence)</span>
+          <span class="pill skill">/gcp-k8s-troubleshoot</span>
+          <span class="pill skill">/grill-with-docs</span>
+          <span class="pill skill">/grill-me</span>
+        </div>
+        <div class="gate">
+          <span class="diamond">&#9670;</span>
+          <span class="gtext"><b>Gate.</b> Context must be complete and agreed before a single document is written. This is where beginners under-invest — and the whole plan inherits the gap.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>03</span></div></div>
+      <div class="pcard">
+        <h3>Define the work — brief &rarr; spec &rarr; plan</h3>
+        <p class="blurb">Three escalating documents, each reviewed by the architect before the next begins. The output is an approved Implementation Plan.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"draft a brief, turn it into a spec, then break it into a phased plan — have the architect review each step"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/create-spec</span>
+          <span class="pill skill">/create-plan</span>
+          <span class="pill skill">/review-doc</span>
+        </div>
+        <div class="persona-line">
+          <span class="meta-label" style="margin:0;">Personas</span>
+          <span class="persona">product-analyst</span>
+          <span class="persona">architect</span>
+        </div>
+        <div class="gate">
+          <span class="diamond">&#9670;</span>
+          <span class="gtext"><b>Hard stop.</b> The agent must pause and ask you about anything unclear before finalising — never let it paper over ambiguity.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORK 03.5 -->
+    <div class="fork reveal">
+      <div class="fork-head">
+        <span class="fork-badge">03.5</span>
+        <h3>Approve the plan</h3>
+        <span class="missing">the fork to make explicit</span>
+      </div>
+      <div class="paths">
+        <div class="path">
+          <div class="ph">Path A</div>
+          <h4>Self-approve</h4>
+          <p>You read and accept the plan yourself, then go straight to implementation. The fast path for well-understood, contained work.</p>
+        </div>
+        <div class="path">
+          <div class="ph">Path B</div>
+          <h4>Human peer review</h4>
+          <p>You route the plan to a colleague for review first, fold in their feedback, then proceed. For higher-risk, cross-cutting, or unfamiliar work.</p>
+        </div>
+      </div>
+      <div class="converge">&darr; &nbsp; both paths converge on <b>Phase 04</b> &nbsp; · &nbsp; pick by blast radius and your own confidence</div>
+    </div>
+
+    <!-- 04 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>04</span></div></div>
+      <div class="pcard">
+        <h3>Implement, test-first</h3>
+        <p class="blurb">Design the tests before the implementation — TDD is mandatory. Define behaviour with a failing test, then build the plan phase by phase.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"design the test plan first, then implement phase 1"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/design-tests</span>
+          <span class="pill skill">/implement</span>
+        </div>
+        <div class="persona-line">
+          <span class="meta-label" style="margin:0;">Personas</span>
+          <span class="persona">tester</span>
+          <span class="persona">security-reviewer (auto, on sensitive diffs)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 05 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>05</span></div></div>
+      <div class="pcard">
+        <h3>Green the tests</h3>
+        <p class="blurb">Run the tests and fix until everything passes. Not done until the new tests and the full suite are green.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"run the tests and fix issues until they all pass"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/verify</span>
+          <span class="pill skill">/coverage</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 06 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>06</span></div></div>
+      <div class="pcard">
+        <h3>Commit, push, PR</h3>
+        <p class="blurb">Approve the commit, push the branch, open the PR. Conventional Commits; <code>Closes #ID</code> in the body; push the explicit branch name.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"commit this, push, and open the PR"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/changelog</span>
+          <span class="pill skill">/jira-workflow</span>
+          <span class="pill tool">jira-proxy do-transition</span>
+        </div>
+        <div class="jira-move">
+          <span class="jlabel">Ticket</span>
+          <span class="from">In Progress</span>
+          <span class="ar">&rarr;</span>
+          <span class="to">Code Review</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 07 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>07</span></div></div>
+      <div class="pcard">
+        <h3>Rewrite history</h3>
+        <p class="blurb">After a while on a branch, clean the commits into logical, reviewable units. Verifies parity with the original tree.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"rewrite the history into clean logical commits"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/rewrite-history</span>
+        </div>
+        <div class="gate">
+          <span class="diamond">&#9670;</span>
+          <span class="gtext">Force-push is blocked in-sandbox — push a fresh branch, or have a human do the force-push externally.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 08 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>08</span></div></div>
+      <div class="pcard">
+        <h3>PR feedback loop</h3>
+        <p class="blurb">Have the agent read what others and the bots left, act on it, and re-request review. Always resolve the thread once the fix is committed.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"read the review comments, address them, then re-request review"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/resolve-copilot-comments</span>
+          <span class="pill skill">/resolve-wiz-findings</span>
+          <span class="pill skill">/review-change</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 09 -->
+    <div class="phase reveal">
+      <div class="rail"><div class="hexnum"><span>09</span></div></div>
+      <div class="pcard">
+        <h3>Approved &amp; merged</h3>
+        <p class="blurb">PR reviewed and approved. Merge is Rebase Merge for linear history — and in-sandbox the human performs the merge. Then capture what you learned.</p>
+        <div class="say-line"><span class="prompt">&rsaquo;</span><span>"crystallise what we learned and archive the plan"</span></div>
+        <div class="runs-label">Agent runs</div>
+        <div class="runs">
+          <span class="pill skill">/mini-dream</span>
+          <span class="pill skill">/archive-plan</span>
+          <span class="pill skill">/refresh-docs</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Once you trust the loop</p>
+      <h2>The escape hatch</h2>
+    </div>
+    <div class="hatch-card reveal">
+      <p>For low-risk, well-scoped work, the whole chain — brief &rarr; spec &rarr; plan &rarr; implement &rarr; verify &rarr; archive — collapses into one autonomous run. Mention it to beginners as the thing you <em>graduate</em> to, not the default you start with.</p>
+      <div class="runs">
+        <span class="pill skill">/beep-it</span>
+        <span class="pill skill">/auto-implement</span>
+      </div>
+      <p style="margin-top:18px; font-size:14px; color:var(--faint);"><code>/beep-it</code> auto-approves the gates end-to-end. <code>/auto-implement</code> runs uninterrupted on edits and local commits — still blocked from push, PR, and Jira.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Closing the loop</p>
+      <h2>The memory cadence</h2>
+    </div>
+    <div class="mem-tiers">
+      <div class="tier reveal">
+        <span class="freq">Every sub-task</span>
+        <h4>Capture</h4>
+        <p><span class="verb">while fresh</span>Crystallise a technical insight the moment a sub-task lands. This is the <code>/mini-dream</code> folded into Phase 09 — high frequency, low ceremony.</p>
+        <div class="runs"><span class="pill skill">/mini-dream</span></div>
+      </div>
+      <div class="tier key reveal">
+        <span class="freq">Manual · periodic</span>
+        <h4>Promote</h4>
+        <p><span class="verb">run it yourself</span>A collaborative cleanup cycle that distils raw mini-dreams across many sessions into high-signal <em>team</em> insights. Run after a cluster of work — not per PR.</p>
+        <div class="runs"><span class="pill skill">/memory-dream</span></div>
+      </div>
+      <div class="tier reveal">
+        <span class="freq">Occasional</span>
+        <h4>Curate</h4>
+        <p><span class="verb">long-term health</span>Consolidate, promote, and archive the knowledge base so it stays high-signal over time.</p>
+        <div class="runs"><span class="pill skill">/memory-garden</span></div>
+      </div>
+    </div>
+    <div class="mem-note reveal">
+      <span class="ic">&#9656;</span>
+      <p>Why <code>/memory-dream</code> is run by hand: the auto-dream git hooks execute as the <code>broker</code> user, which can't reach <code>/home/sandbox</code> — so they never fire in the sandbox. A deliberate manual run is the reliable mechanism, not a fallback.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">For the rollout</p>
+      <h2>Two things to encode as team policy</h2>
+    </div>
+    <div class="notes">
+      <div class="note reveal">
+        <span class="n">02</span>
+        <div>
+          <h4>Make the context gate non-negotiable</h4>
+          <p>The most common beginner failure is jumping to "build me X" before Phase 02 is complete. Every weakness in the plan traces back to a gap here. The guide should make this gate feel mandatory, not optional.</p>
+        </div>
+      </div>
+      <div class="note reveal">
+        <span class="n">03.5</span>
+        <div>
+          <h4>The fork is your governance hook</h4>
+          <p>Phase 03.5 is the natural place to set a team rule — e.g. <em>Path B (human review) is mandatory for anything touching auth or shared infrastructure.</em> An agent peer review via <code>/review-doc</code> complements, but never replaces, the human path.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Beep Sandbox · agentic development workflow</span>
+    <span>conversation-first · skills spelled out</span>
+  </div>
+</footer>
+
+<script>
+  // Honeycomb texture — drawn once, on-theme, low intensity.
+  (function () {
+    var c = document.getElementById("hex");
+    if (!c) return;
+    var ctx = c.getContext("2d");
+    function draw() {
+      var host = c.parentElement;
+      var w = c.width = host.offsetWidth;
+      var h = c.height = host.offsetHeight;
+      ctx.clearRect(0, 0, w, h);
+      var r = 34;                       // hex radius
+      var dx = r * 1.5;
+      var dy = r * Math.sqrt(3);
+      ctx.lineWidth = 1;
+      var col = 0;
+      for (var x = -r; x < w + r; x += dx) {
+        var yOff = (col % 2) ? dy / 2 : 0;
+        for (var y = -r; y < h + r; y += dy) {
+          drawHex(ctx, x, y + yOff, r * 0.92);
+        }
+        col++;
+      }
+    }
+    function drawHex(ctx, cx, cy, rad) {
+      ctx.beginPath();
+      for (var i = 0; i < 6; i++) {
+        var a = Math.PI / 180 * (60 * i);
+        var px = cx + rad * Math.cos(a);
+        var py = cy + rad * Math.sin(a);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      // fade from amber near top to faint teal lower down
+      var t = cy / (ctx.canvas.height || 1);
+      ctx.strokeStyle = t < 0.45
+        ? "rgba(242,169,59," + (0.10 * (1 - t)) + ")"
+        : "rgba(95,190,169,0.05)";
+      ctx.stroke();
+    }
+    draw();
+    var rid;
+    window.addEventListener("resize", function () {
+      clearTimeout(rid);
+      rid = setTimeout(draw, 150);
+    });
+  })();
+
+  // Scroll reveal
+  (function () {
+    var els = document.querySelectorAll(".reveal");
+    if (!("IntersectionObserver" in window)) {
+      els.forEach(function (e) { e.classList.add("in"); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.12 });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+</script>
