@@ -257,7 +257,7 @@ All Replatforming epics mapped to their Milestone and Increment. See [doc 15](15
 
 ### M2: Shadow Mode Validation (P0 — Active)
 
-| Inc | Epics |  |
+| Inc | Epics | Target week |
 |-----|-------|-------|
 | **2.1 Core Data Tap** | PLT-2353, 2483, 2496, 2494, 2495, 2492, 2488, 2714 (8 export pipes) | 30 |
 | **2.2 Shadow Mode Completion** | PLT-2497 (Closed), PLT-2354 (Shadow Mode orchestration), PLT-2359(ECC Rendering Support) | 32 |
@@ -266,19 +266,19 @@ All Replatforming epics mapped to their Milestone and Increment. See [doc 15](15
 
 ### M3: First Tenant Go-Live (P1 — Gated)
 
-| Inc | Epics |
-|-----|-------|
-| **Inc 1: Item+Link APIs** | PLT-2651 (validation), PLT-2378 (Patch APIs), PLT-2274 (SIC), PLT-171 (SLA), PLT-2658 (LFS protection), PLT-2360/2361/2350/2356/2363/2352 (features) |
-| **Inc 2: Security & Isolation** | PLT-2578 (tenant isolation), PLT-170 (write protection) |
-| **Inc 3: Tenant Switch** | PLT-2601 (tenant selection), PLT-2572/2575 (store onboarding), PLT-2600 (studio readiness), PLT-2430 (integration tests) |
+| Inc | Epics | Target week |
+|-----|-------|-------|
+| **Inc 1: Item+Link APIs** | PLT-2651 (validation), PLT-2378 (Patch APIs), PLT-2274 (SIC), PLT-171 (SLA), PLT-2658 (LFS protection), PLT-2360/2361/2350/2356/2363/2352 (features) | 36 |
+| **Inc 2: Security & Isolation** | PLT-2578 (tenant isolation), PLT-170 (write protection) | 37 |
+| **Inc 3: Tenant Switch** | PLT-2601 (tenant selection), PLT-2572/2575 (store onboarding), PLT-2600 (studio readiness), PLT-2430 (integration tests) | 38 |
 
 ### M4: Production Hardening (P1 — Not started)
 
-| Inc | Epics |
-|-----|-------|
-| **Inc 1: Monitoring** | PLT-2579 (dashboards), PLT-2444 (status reporting) |
-| **Inc 2: Load Test** | PLT-2576 (load testing), PLT-2369 (auto-scaling) |
-| **Inc 3: DR & Runbook** | PLT-2599 (cutover runbook), PLT-2580 (DR), PLT-2581 (operational runbooks) |
+| Inc | Epics | Target week |
+|-----|-------|-------|
+| **Inc 1: Monitoring** | PLT-2579 (dashboards), PLT-2444 (status reporting) | 41 |
+| **Inc 2: Load Test** | PLT-2576 (load testing), PLT-2369 (auto-scaling) | 42 |
+| **Inc 3: DR & Runbook** | PLT-2599 (cutover runbook), PLT-2580 (DR), PLT-2581 (operational runbooks) | 44 |
 
 ### M5: Feature Parity (P2 — Not started)
 
