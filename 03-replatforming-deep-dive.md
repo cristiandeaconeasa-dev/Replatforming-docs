@@ -135,9 +135,9 @@ flowchart LR
 
 | Phase | Goal | Gate |
 |-------|------|------|
-| **P0: Prove It** | Prove the cloud pipeline works end‑to‑end with internal tenants in Shadow Mode — zero label risk | **PLT‑2354** Shadow Mode parity confirmed: 24h of 100% rendered-image match across 3 tenants |
-| **P1: Ship It** | First *real*, revenue‑generating tenant live on the cloud path for basic features. Controlled risk — incremental migration with rollback. | byPricer → small customer → medium customer all stable on DTOflow for 2 weeks each |
-| **P2: Scale It** | All tenants migrated. Full feature parity with R3Server (timed updates, ECC sync, GeoPos, segment labels, subscriptions, webhooks). | Every tenant on DTOflow. R3Server is transmission‑only for all stores. |
+| **P0: Prove It** | Prove the cloud pipeline works end‑to‑end with internal tenants in Shadow Mode — zero label risk | **W34** (Aug 23). PLT‑2354 Shadow Mode parity confirmed: 24h of 100% rendered-image match across 3 tenants + API parity validation + routing |
+| **P1: Ship It** | First *real*, revenue‑generating tenant live on the cloud path for basic features. Controlled risk — incremental migration with rollback. | **W38** byPricer · **W44** ops ready. byPricer → small customer → medium customer all stable on DTOflow for 2 weeks each |
+| **P2: Scale It** | All tenants migrated. Full feature parity with R3Server (timed updates, ECC sync, GeoPos, segment labels, subscriptions, webhooks). | **2027** — every tenant on DTOflow. R3Server is transmission‑only for all stores. |
 
 **Current status (2026-06-30):** Shadow Mode is now **In Progress** (PLT-2354, Daniel Pettersson). The storeitemvalues export data pipe (PLT-2483) is **Ready for Deploy** (Johan Ekman). The CQS client in R3Server (PLT-1870) is in **Test** (Daniel Pettersson). PSC setup for Cloud Run continues (PLT-2336).
 

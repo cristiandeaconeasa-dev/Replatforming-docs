@@ -540,7 +540,7 @@ flowchart TB
 
 > Activities that close Phase 0 gates (Shadow Mode completion, per-API-path routing, tenant isolation proofs) are prerequisites to M3 and are covered in the Phase 0 status doc ([15](15-overall-status.md)). This section focuses on work that starts once M2 (Shadow Mode Validation) closes.
 
-### M3 Inc 1: Item & Link APIs Live (Architect Areas 1, 2) — Target W38 (Sep 20)
+### M3 Inc 1: Item & Link APIs Live (Architect Areas 1, 2) — Target W36 (Sep 6)
 
 | Step | What | Epic | Target |
 |------|------|------|--------|
@@ -554,7 +554,7 @@ flowchart TB
 
 **Demo:** Write an item via PATCH → item passes validation → `storeitemvalues` appears in Spanner → CQS fans out → evaluator + renderer process it → `eslimage` written.
 
-### M3 Inc 2: Security & Isolation (Architect Area 3) — Target W40 (Oct 4)
+### M3 Inc 2: Security & Isolation (Architect Area 3) — Target W37 (Sep 13)
 
 | Step | What | Epic | Target |
 |------|------|------|--------|
@@ -563,7 +563,7 @@ flowchart TB
 
 **Demo:** Provision two tenants. Write data for both. Attempt cross-tenant reads through every Cloud Run service. All rejected.
 
-### M3 Inc 3: Tenant Switch (Architect Areas 5, 6) — Target W44 (Nov 1, byPricer go-live)
+### M3 Inc 3: Tenant Switch (Architect Areas 5, 6) — Target W38 (Sep 20, byPricer go-live)
 
 | Step | What | Epic | Target |
 |------|------|------|--------|
@@ -574,27 +574,27 @@ flowchart TB
 | 3e | Per-tenant Shadow Mode | — | Enable Shadow Mode for the Phase 1 tenant. 24+ hour image parity confirmed. Config → items → links pushed in dependency order. |
 | 3f | Execute 7-step switch — byPricer | — | Switch procedure from [doc 14](14-tenant-migration.md), rehearsed on Phase 0 tenant first |
 
-**Demo:** byPricer tenant live on DTOflow. Item updates flow through cloud path. R3Server is thin edge (transmission only).
+**Demo:** byPricer tenant live on DTOflow. Item updates flow through cloud path. R3Server is thin edge (transmission only). Done by W38.
 
-### M4 Inc 1: Monitoring (Architect Area 4) — Target W42 (Oct 18)
+### M4 Inc 1: Monitoring (Architect Area 4) — Target W41 (Oct 11)
 
 | Step | What | Epic | Target |
 |------|------|------|--------|
 | 1a | Production monitoring dashboards | PLT-2579 | CQS queue depth, Spanner latency, Cloud Run error rates, transmission success rates |
 | 1b | Status reporting API | PLT-2444 | Item update metrics API |
 
-**Demo:** Live dashboard showing pipeline health for the cut-over tenant.
+**Demo:** Live dashboard showing pipeline health for the cut-over tenant. Done by W41.
 
-### M4 Inc 2: Load Test (Architect Area 5) — Target W46 (Nov 15)
+### M4 Inc 2: Load Test (Architect Area 5) — Target W42 (Oct 18)
 
 | Step | What | Epic | Target |
 |------|------|------|--------|
 | 2a | Production-scale load testing | PLT-2576 | 2–3× peak tenant volume replayed; p99 latency parity confirmed |
 | 2b | Auto-scaling validated | PLT-2369 | CQS-driven scaling or Cloud Run built-in confirmed sufficient |
 
-**Demo:** Replay the tenant's historical update volume at 2× peak. All pipelines stay within latency thresholds.
+**Demo:** Replay the tenant's historical update volume at 2× peak. All pipelines stay within latency thresholds. Done by W42.
 
-### M4 Inc 3: DR & Runbook (Architect Area 4) — Target W50 (Dec 13)
+### M4 Inc 3: DR & Runbook (Architect Area 4) — Target W44 (Nov 1)
 
 | Step | What | Epic | Target |
 |------|------|------|--------|
@@ -602,7 +602,7 @@ flowchart TB
 | 3b | Disaster recovery | PLT-2580 | Spanner scheduled backups; documented restore procedure; DR drill passed |
 | 3c | Operational runbooks | PLT-2581 | Per-service runbooks for common failure scenarios |
 
-**Demo:** Execute the full switch + rollback on byPricer. Execute DR restore from backup. Both complete within recovery windows.
+**Demo:** Execute the full switch + rollback on byPricer. Execute DR restore from backup. Both complete within recovery windows. Done by W44.
 
 ### Post-Cutover: Hypercare
 
@@ -654,13 +654,13 @@ For readers familiar with the earlier 5-Workstream structure:
 | Phase | Activities | Duration | Target | Depends On |
 |-------|-----------|----------|--------|------------|
 | **Pre-Phase 1** (W27-29) | Unblock PLT-2651 + PLT-2378. Assign Shadow Mode sub-tasks. Reassign PLT-2101. | 2–3 weeks | **W29** (Jul 19) | — |
-| **M3 Inc 1** (W30-38) | Implement PLT-2651, PLT-2378. Complete Shadow Mode on Phase 0 tenants. PLT-2101 routing. Tenant isolation (PLT-2578). | 4–6 weeks (overlaps with P0 tail) | **W38** (Sep 20) | Pre-Phase 1 |
-| **M3 Inc 2** (W38-40) | PLT-2578 (tenant isolation), PLT-170 (write protection). Security proofs for multi-tenancy. | 2–3 weeks | **W40** (Oct 4) | M3 Inc 1 |
-| **M4 Inc 1** (W38-42) | PLT-171 (SLA/trackingId), PLT-2579 (monitoring dashboards), PLT-2444 (status reporting). Overlaps with M3 Inc 2. | 3–4 weeks | **W42** (Oct 18) | — |
-| **M3 Inc 3** (W38-44) | PLT-2601 (select tenant), PLT-2572/2575 (onboarding), PLT-2600 (studio readiness). Shadow Mode + switch for byPricer. | 4–6 weeks | **W44** (Nov 1) | M3 Inc 1 + M3 Inc 2 gates |
-| **M4 Inc 2** (W44-46) | Load testing (PLT-2576), auto-scaling validation (PLT-2369). | 2 weeks | **W46** (Nov 15) | byPricer live (W44) |
-| **M4 Inc 3** (W46-50) | Cutover runbook (PLT-2599), DR (PLT-2580), operational runbooks (PLT-2581). | 2–3 weeks | **W50** (Dec 13) | Load test complete |
-| **Remaining tenants** (W50+) | Small customer Switch → hypercare (2w) → medium customer Switch → hypercare (2w). | 4–6 weeks per tenant | **Q1 2027** | M4 closed |
+| **M3 Inc 1** (W30-36) | Implement PLT-2651, PLT-2378. Complete Shadow Mode on Phase 0 tenants. PLT-2101 routing. Tenant isolation (PLT-2578). | 4–6 weeks (overlaps with P0 tail) | **W36** (Sep 6) | Pre-Phase 1 |
+| **M3 Inc 2** (W35-37) | PLT-2578 (tenant isolation), PLT-170 (write protection). Security proofs for multi-tenancy. | 2–3 weeks | **W37** (Sep 13) | M3 Inc 1 |
+| **M4 Inc 1** (W38-41) | PLT-171 (SLA/trackingId), PLT-2579 (monitoring dashboards), PLT-2444 (status reporting). | 3–4 weeks | **W41** (Oct 11) | — |
+| **M3 Inc 3** (W35-38) | PLT-2601 (select tenant), PLT-2572/2575 (onboarding), PLT-2600 (studio readiness). Shadow Mode + switch for byPricer. | 4–6 weeks | **W38** (Sep 20) | M3 Inc 1 + M3 Inc 2 gates |
+| **M4 Inc 2** (W39-42) | Load testing (PLT-2576), auto-scaling validation (PLT-2369). | 2–3 weeks | **W42** (Oct 18) | byPricer live (W38) |
+| **M4 Inc 3** (W42-44) | Cutover runbook (PLT-2599), DR (PLT-2580), operational runbooks (PLT-2581). | 2–3 weeks | **W44** (Nov 1) | Load test complete |
+| **Remaining tenants** (W44+) | Small customer Switch → hypercare (2w) → medium customer Switch → hypercare (2w). | 4–6 weeks per tenant | **Q1 2027** | M4 closed |
 
 ---
 

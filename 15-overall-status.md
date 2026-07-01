@@ -43,10 +43,10 @@ Every epic carries a **Capability tag** — `[C1]` through `[C5]` — for archit
 
 | Milestone | Phase | Goal | Increments | Gate | Target |
 |-----------|-------|------|-------------|------|--------|
-| **M1: Platform Foundation** | P0 | Core infrastructure live and certified | 3 | All three Increment demos pass | **W30** (Jul 26) |
-| **M2: Shadow Mode Validation** | P0 | Cloud pipeline runs in parallel with edge. Zero label risk. | 3 | 24h parity across three tenants confirmed | **W34** (Aug 23) |
-| **M3: First Tenant Go-Live** | P1 | Item and link API traffic cut over to cloud | 3 | One real tenant live for basic flows | **W44** (Nov 1) |
-| **M4: Production Hardening** | P1 | Monitoring, load testing, DR, runbooks | 3 | All ops gates passed | **W50** (Dec 13) |
+| **M1: Platform Foundation** | P0 | Core infrastructure live and certified | 2 | All Increment demos pass | **W31** (Aug 2) |
+| **M2: Shadow Mode Validation** | P0 | Cloud pipeline runs in parallel with edge. Zero label risk. | 4 | 24h parity across three tenants confirmed | **W34** (Aug 23) |
+| **M3: First Tenant Go-Live** | P1 | Item and link API traffic cut over to cloud | 3 | One real tenant live for basic flows | **W38** (Sep 20) |
+| **M4: Production Hardening** | P1 | Monitoring, load testing, DR, runbooks | 3 | All ops gates passed | **W44** (Nov 1) |
 | **M5: Feature Parity** | P2 | Timed updates, ECC sync, autoscaling, SLAs | TBD | Feature parity with R3Server achieved | 2027 |
 | **M6: Full Migration** | P2 | All tenants migrated | TBD | All tenants on cloud | 2027 |
 
@@ -81,8 +81,7 @@ M1 and M2 are active. M3 is gated by two blocked epics (PLT-2651, PLT-2378). M4 
 | Inc | Name | Demo | Status | Target |
 |-----|------|------|--------|--------|
 | **1.1** | Core Event Routing | Dummy DTO → CQS → Cloud Run queue | 🟡 Active | **W29** (Jul 19) |
-| **1.2** | Cloud/Edge Bridge | R3Server receives from cloud CQS | 🟡 Active | **W29** (Jul 19) |
-| **1.3** | Production Ingress & Security | URL-path routing → PSC → private Cloud Run | 🟡 Not started | **W30** (Jul 26) |
+| **1.2** | Internal Comm & Security | R3Server ↔ cloud CQS bridge + PSC + PROD certification | 🟡 Active | **W31** (Aug 2) |
 
 ### Increment 1.1: Core Event Routing
 
@@ -94,18 +93,12 @@ M1 and M2 are active. M3 is gated by two blocked epics (PLT-2651, PLT-2378). M4 
 | PLT-2792 | `[C1]` | 🟡 In Progress | Bart De Boer | Services own their CQS queues |
 | PLT-2478 | `[C1]` | 🟡 In Progress | Sreekanth S. Uppara | Pricer Server ↔ CQS / DTOflow integration design |
 
-### Increment 1.2: Cloud/Edge Bridge
+### Increment 1.2: Internal Comm & Security
 
 | Epic | Cap | Status | Assignee | Summary |
 |------|-----|--------|----------|---------|
 | PLT-1870 | `[C4]` | 🟡 Test | Daniel Pettersson | CQS client in R3Server — edge-side work dispatch |
-
-### Increment 1.3: Production Ingress & Security
-
-| Epic | Cap | Status | Assignee | Summary |
-|------|-----|--------|----------|---------|
 | PLT-2336 | `[C1]` | 🟡 In Progress | Sreekanth S. Uppara | DTOflow accessible via Private Service Connect |
-| PLT-2101 | `[C1]` | 🟡 Selected | Saikiran Katta | Per-API-path routing at ingress — incremental migration mechanism |
 | PLT-2118 | `[C1]` | 🟡 Test | Bart De Boer | DTOflow PROD-ready certification for Task & Scenario |
 
 ---
@@ -114,9 +107,10 @@ M1 and M2 are active. M3 is gated by two blocked epics (PLT-2651, PLT-2378). M4 
 
 | Inc | Name | Demo | Status | Target |
 |-----|------|------|--------|--------|
-| **2.1** | Core Data Tap | Price update in R3 → all DTOs in Spanner | 🟡 Active | **W28** (Jul 12) |
-| **2.2** | Shadow Execution & Studio Parity | Item change → cloud render → transmit dropped | 🟡 Active | **W31** (Aug 2) |
-| **2.3** | Multi-Tenant Shadow Validation | 24h parity on 3 tenants | 🔵 Not started | **W34** (Aug 23) |
+| **2.1** | Core Data Tap | Price update in R3 → all DTOs in Spanner | 🟡 Active | **W30** (Jul 26) |
+| **2.2** | Shadow Mode Completion | Item change → cloud render → transmit dropped | 🟡 Active | **W32** (Aug 9) |
+| **2.3** | API Parity Validation | Extend API dev to cover Basic Functionality | 🔵 Not started | **W33** (Aug 16) |
+| **2.4** | Routing | Per-API-path routing at ingress | 🔵 Not started | **W34** (Aug 23) |
 
 ### Increment 2.1: Core Data Tap
 
@@ -133,22 +127,33 @@ M1 and M2 are active. M3 is gated by two blocked epics (PLT-2651, PLT-2378). M4 
 | PLT-2488 | `[C4]` | 🟡 Selected | Unassigned | `itemproperties` export |
 | PLT-2714 | `[C4]` | 🟡 Selected | Unassigned | `itemproperties` startup export |
 
-### Increment 2.2: Shadow Execution & Studio Parity
+### Increment 2.2: Shadow Mode Completion
 
 | Epic | Cap | Status | Assignee | Summary |
 |------|-----|--------|----------|---------|
 | PLT-2497 | `[C4]` | ✅ Closed | Unassigned | consume-ignore-linked mode — label transmit safely dropped |
 | PLT-2354 | `[C4]` | 🟡 In Progress | Daniel Pettersson | Shadow Mode orchestration — parallel cloud pipeline |
+| PLT-2359 | `[C3]` | 🟡 In Progress | Bart De Boer | ECC Rendering Support — **added to Phase 0 from M5** |
 
-### Increment 2.3: Multi-Tenant Shadow Validation
+### Increment 2.3: API Parity Validation
 
-No discrete epics. This Increment is a validation gate: run Shadow Mode on Replatforming-Dev, Evo-Se, and Application-Stage back-to-back for 24 hours with 100% rendered-image parity. Clears the Phase 0 gate.
+| Epic | Cap | Status | Assignee | Summary |
+|------|-----|--------|----------|---------|
+| PLT-2966 | `[C2]` | 🔵 Backlog | Unassigned | API Parity Validation — new epic for Inc 2.3 gate |
+| PLT-2357 | `[C3]` | 🟡 Selected | Unassigned | Linked Item APIs — Items |
+| PLT-2358 | `[C3]` | 🟡 Selected | Unassigned | Linked Item APIs — Devices |
+
+### Increment 2.4: Routing
+
+| Epic | Cap | Status | Assignee | Summary |
+|------|-----|--------|----------|---------|
+| PLT-2101 | `[C1]` | 🟡 Selected | Saikiran Katta | Per-API-path routing — the mechanism that makes migration incremental |
 
 ---
 
 ## 5. Phase 1 Preview: M3 & M4
 
-> **Increment decomposition and week targets for M3 and M4 are defined in [doc 17](17-phase-1-plan.md#10-key-activities--milestones).** M3: Inc 1 (Item+Link APIs) → W38, Inc 2 (Security & Isolation) → W40, Inc 3 (Tenant Switch) → W44. M4: Inc 1 (Monitoring) → W42, Inc 2 (Load Test) → W46, Inc 3 (DR & Runbook) → W50. Epics listed below are flat until the Increment mapping is finalised. The two blocked epics in M3 are the highest-priority action in the program today.
+> PLT-2357 and PLT-2358 appear in both M2 Inc 2.3 (Phase 0: API parity validation) and M3 (Phase 1: full Linked Item API implementation). Phase 0 validates basic parity; Phase 1 completes the full feature set. Same pattern as PLT-2359 (used in Inc 2.2 for Phase 0 ECC rendering support, full scope in M5).
 
 ### M3: First Tenant Go-Live
 
@@ -254,10 +259,10 @@ All services deployed in GCP project `platform-dev-p01`, region `europe-north1`.
 
 | Milestone | Status | Key Signal | Target |
 |-----------|--------|------------|--------|
-| **M1: Platform Foundation** | 🟡 Active | CQS (1.1) In Progress; Edge Bridge (1.2) in Test; Ingress (1.3) not started | **W30** (Jul 26) |
+| **M1: Platform Foundation** | 🟡 Active | CQS (1.1) In Progress; Internal Comm (1.2) in Test | **W31** (Aug 2) |
 | **M2: Shadow Mode Validation** | 🟡 Active | 2 data pipes Ready for Deploy (2.1); Shadow orchestration In Progress (2.2) | **W34** (Aug 23) |
-| **M3: First Tenant Go-Live** | 🔴 Gated | 2 blocked & unassigned epics — highest-priority action in the program | **W44** (Nov 1) |
-| **M4: Production Hardening** | 🔵 Not started | All 11 epics in Backlog | **W50** (Dec 13) |
+| **M3: First Tenant Go-Live** | 🔴 Gated | 2 blocked & unassigned epics — highest-priority action in the program | **W38** (Sep 20) |
+| **M4: Production Hardening** | 🔵 Not started | All 11 epics in Backlog | **W44** (Nov 1) |
 | **M5: Feature Parity** | 🔵 Not started | 19 epics in Backlog; one with early progress | 2027 |
 
 ### Key End-to-End Flows
@@ -300,7 +305,7 @@ In priority order:
 2. **Assign owner to PLT-2378** (Item Patch APIs) — gates both consumer API cutovers.
 3. **Land PLT-2483** (storeitemvalues export) — Ready for Deploy, completes Inc 2.1.
 4. **Finish PLT-1870** (CQS client in R3Server) — in Test, completes Inc 1.2.
-5. **Certify PLT-2118** (DTOflow PROD-ready) — completes Inc 1.3.
+5. **Certify PLT-2118** (DTOflow PROD-ready) — completes Inc 1.2.
 6. **Drive PLT-2601** (First Tenant Selection) — from Backlog to decision, unlocks M3.
 
 ---

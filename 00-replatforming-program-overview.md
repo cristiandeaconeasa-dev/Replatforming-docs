@@ -32,7 +32,7 @@ Zero label risk      First real tenant    All tenants, full parity
 | **Risk** | Zero — Shadow Mode runs in parallel, label transmit is dropped | Controlled — per-API-path routing enables incremental migration and rollback | Managed — each tenant validated before the next |
 | **Output** | Cloud pipeline produces 100% identical images to the edge, validated for 24h on 3 tenants | First customer runs on DTOflow. R3Server is thin edge (transmission only). | DTOflow replaces R3Server for all non-transmission functions. |
 | **Prerequisites** | DTOflow infrastructure live (Spanner, Pub/Sub, CQS, Cloud Run) | P0 closed. Item APIs + per-API-path routing live. Tenant isolation proven. | P1 closed. All features built. Ops readiness complete. |
-| **Target** | **Week 34** (Aug 17-23, 2026) | **W44**: byPricer · **W50**: ops ready · **Q1 2027**: all 3 tenants | **2027** — scoped after P1 closes |
+| **Target** | **Week 34** (Aug 17-23, 2026) | **W38**: byPricer · **W44**: ops ready · **Q1 2027**: all 3 tenants | **2027** — scoped after P1 closes |
 
 ### Phase 0: Prove It
 
@@ -87,10 +87,10 @@ Phase → Milestone → Increment → Epic
 
 | Phase | Milestone | Goal | Status | Target |
 |-------|-----------|------|--------|--------|
-| P0 | **M1: Platform Foundation** | Core infrastructure live and certified | 🟡 Active | **W30** (Jul 26) |
+| P0 | **M1: Platform Foundation** | Core infrastructure live and certified | 🟡 Active | **W31** (Aug 2) |
 | P0 | **M2: Shadow Mode Validation** | Cloud pipeline runs in parallel with edge. Zero label risk. | 🟡 Active | **W34** (Aug 23) |
-| P1 | **M3: First Tenant Go-Live** | Item and link API traffic cut over to cloud | 🔴 Gated | **W44** (Nov 1) |
-| P1 | **M4: Production Hardening** | Monitoring, load testing, DR, runbooks | 🔵 Not started | **W50** (Dec 13) |
+| P1 | **M3: First Tenant Go-Live** | Item and link API traffic cut over to cloud | 🔴 Gated | **W38** (Sep 20) |
+| P1 | **M4: Production Hardening** | Monitoring, load testing, DR, runbooks | 🔵 Not started | **W44** (Nov 1) |
 | P2 | **M5: Feature Parity** | Timed updates, ECC sync, autoscaling, SLAs | 🔵 Not started | 2027 |
 | P2 | **M6: Full Migration** | All tenants migrated | 🔵 Not started | 2027 |
 
@@ -99,11 +99,11 @@ Phase → Milestone → Increment → Epic
 | Milestone | Inc | Name | Demo | Status | Target |
 |-----------|-----|------|------|--------|--------|
 | M1: Platform Foundation | 1.1 | Core Event Routing | Dummy DTO → CQS → Cloud Run queue | 🟡 Active | **W29** (Jul 19) |
-| | 1.2 | Cloud/Edge Bridge | R3Server receives from cloud CQS | 🟡 Active | **W29** (Jul 19) |
-| | 1.3 | Production Ingress & Security | URL-path routing → PSC → private Cloud Run | 🟡 Not started | **W30** (Jul 26) |
-| M2: Shadow Mode Validation | 2.1 | Core Data Tap | Price update in R3 → all DTOs appear in Spanner | 🟡 Active | **W28** (Jul 12) |
-| | 2.2 | Shadow Execution & Studio Parity | Item change → cloud render → transmit dropped | 🟡 Active | **W31** (Aug 2) |
-| | 2.3 | Multi-Tenant Shadow Validation | 24h parity on 3 tenants | 🔵 Not started | **W34** (Aug 23) |
+| | 1.2 | Internal Comm & Security | R3Server ↔ cloud CQS bridge + PSC + PROD certification | 🟡 Active | **W31** (Aug 2) |
+| M2: Shadow Mode Validation | 2.1 | Core Data Tap | Price update in R3 → all DTOs appear in Spanner | 🟡 Active | **W30** (Jul 26) |
+| | 2.2 | Shadow Mode Completion | Item change → cloud render → transmit dropped | 🟡 Active | **W32** (Aug 9) |
+| | 2.3 | API Parity Validation | Extend API dev to cover Basic Functionality | 🔵 Not started | **W33** (Aug 16) |
+| | 2.4 | Routing | Per-API-path routing (PLT-2101) | 🔵 Not started | **W34** (Aug 23) |
 
 Every Increment ends with a **named demo scenario** — a specific, verifiable outcome that can be shown in a sprint review.
 
@@ -234,9 +234,9 @@ The `platform-image-render-service` (TypeScript, Node.js) receives Pub/Sub push 
 
 | Date | Milestone |
 |------|-----------|
-| **Week 34** (Aug 17-23, 2026) | Phase 0 close (realistic, assuming PLT-2354 corrected to 5w and summer vacation factored) |
-| **Week 44** (Oct 26-Nov 1, 2026) | First Phase 1 tenant (byPricer) live on DTOflow |
-| **Week 50** (Dec 7-13, 2026) | M4 closed — ops readiness complete |
+| **Week 34** (Aug 17-23, 2026) | Phase 0 close — all M2 increments complete |
+| **Week 38** (Sep 14-20, 2026) | First Phase 1 tenant (byPricer) live on DTOflow — M3 closed |
+| **Week 44** (Oct 26-Nov 1, 2026) | M4 closed — ops readiness complete |
 | **Q1 2027** | Phase 1 complete — small + medium customer live |
 | **2027** | Phase 2 — full feature parity, all tenants migrated |
 
@@ -261,7 +261,7 @@ All Replatforming epics mapped to their Milestone and Increment. See [doc 15](15
 |-----|-------|-------|
 | **2.1 Core Data Tap** | PLT-2353, 2483, 2496, 2494, 2495, 2492, 2488, 2714 (8 export pipes) | 30 |
 | **2.2 Shadow Mode Completion** | PLT-2497 (Closed), PLT-2354 (Shadow Mode orchestration), PLT-2359(ECC Rendering Support) | 32 |
-| **2.3 API Parity Validation** | Extend API development to cover Basic Functionality | 33 |
+| **2.3 API Parity Validation** | PLT-2966 (new), PLT-2357 (Linked Item APIs — Items), PLT-2358 (Linked Item APIs — Devices) | 33 |
 | **2.4 Routing** | PLT-2101 (per-API-path routing) | 34 |
 
 ### M3: First Tenant Go-Live (P1 — Gated)

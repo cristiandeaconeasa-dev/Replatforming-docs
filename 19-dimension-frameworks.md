@@ -36,7 +36,7 @@ Four levels. Each answers a different question. None of them collapse into each 
 
 1. **Every Increment ends with a named demo.** The team rehearses a specific, disprovable scenario — "Publish a dummy DTO to Pub/Sub and watch CQS fan it out to a Cloud Run queue." This defines what to build before work starts. It prevents the backward-building problem: implementation beginning before the outcome is clear.
 
-2. **Dependencies are physically enforced.** You cannot demo Increment 2.2 (Shadow Execution) without Increment 2.1 (Data Tap) being live. The demo dependency chain prevents work from starting in the wrong order — even accidentally.
+2. **Dependencies are physically enforced.** You cannot demo Increment 2.2 (Shadow Mode Completion) without Increment 2.1 (Data Tap) being live. The demo dependency chain prevents work from starting in the wrong order — even accidentally.
 
 3. **Sprint-sized deliverables.** No more "Foundation" sitting In Progress for months. Each Increment is 2-4 epics — completable in 2-4 weeks with a verifiable result.
 
@@ -62,8 +62,8 @@ Six Milestones across three Phases. Defined upfront so the framework doesn't col
 
 | Phase | Milestone | Goal | Increments |
 |-------|-----------|------|-------------|
-| **P0: Prove It** | M1: Platform Foundation | Core infrastructure operational — Spanner, Pub/Sub, CQS, ingress routing all live and certified | 3 |
-| | M2: Shadow Mode Validation | Cloud pipeline runs in parallel with edge. Zero label risk. 24h parity confirmed. | 3 |
+| **P0: Prove It** | M1: Platform Foundation | Core infrastructure operational — Spanner, Pub/Sub, CQS, ingress routing all live and certified | 2 |
+| | M2: Shadow Mode Validation | Cloud pipeline runs in parallel with edge. Zero label risk. 24h parity confirmed. | 4 |
 | **P1: Ship It** | M3: First Tenant Go-Live | Item and link API traffic cut over from R3Server to cloud. One real tenant live for basic flows. | 3 |
 | | M4: Production Hardening | Monitoring, load testing, DR, cutover runbooks. All ops gates passed. | 3 |
 | **P2: Scale It** | M5: Feature Parity | Timed updates, ECC sync, autoscaling, SLAs, segment labels, webhooks. | TBD |
@@ -78,16 +78,16 @@ Six Milestones across three Phases. Defined upfront so the framework doesn't col
 | Inc | Name | Epics | Demo |
 |-----|------|-------|------|
 | **1.1** | Core Event Routing | PLT-2294, PLT-169, PLT-2792, PLT-2478 | Publish a dummy DTO to Pub/Sub → CQS on GKE fans it out → a Cloud Run service dequeues it successfully |
-| **1.2** | Cloud/Edge Bridge | PLT-1870 | R3Server (edge) receives and acknowledges a message from the cloud CQS queue |
-| **1.3** | Production Ingress & Security | PLT-2336, PLT-2101, PLT-2118 | Hit a public ingress endpoint by URL path → correctly routed over PSC → hits a private Cloud Run backend |
+| **1.2** | Internal Comm & Security | PLT-1870, PLT-2336, PLT-2118 | R3Server receives from cloud CQS + DTOflow accessible via PSC + DTOflow PROD-ready certification complete |
 
 ### M2: Shadow Mode Validation
 
 | Inc | Name | Epics | Demo |
 |-----|------|-------|------|
 | **2.1** | Core Data Tap | PLT-2353, PLT-2483, PLT-2496, PLT-2494, PLT-2495, PLT-2492, PLT-2488, PLT-2714 | Update a price in R3Server → all DTOs (storeitemvalues, link.v2, ECC params, ESL status, itemproperties) appear in Cloud Spanner within seconds |
-| **2.2** | Shadow Execution & Studio Parity | PLT-2497, PLT-2354 | Same price change triggers cloud evaluator + renderer → eslimage written to Spanner. `consume-ignore-linked` drops the transmission command. Zero labels touched. |
-| **2.3** | Multi-Tenant Shadow Validation | — | Run Replatforming-Dev → Evo-Se → Application-Stage back-to-back. 24 hours of continuous parity. Phase 1 gate cleared. |
+| **2.2** | Shadow Mode Completion | PLT-2497, PLT-2354, PLT-2359 | Same price change triggers cloud evaluator + renderer → `renderedimage` written to Spanner. `consume-ignore-linked` drops the transmission command. ECC rendering support validated. Zero labels touched. |
+| **2.3** | API Parity Validation | PLT-2966, PLT-2357, PLT-2358 | Extend API development to cover Basic Functionality — item APIs, link APIs, and rendering APIs validated against Phase 0 tenants |
+| **2.4** | Routing | PLT-2101 | Per-API-path routing at ingress — the mechanism that makes migration incremental. Hit a public ingress endpoint by URL path → routed over PSC → hits private Cloud Run. |
 
 ---
 
@@ -108,8 +108,8 @@ Every epic carries one of these tags in the epic mapping tables. Used for archit
 ## 7. Implementation
 
 1. **Every Increment gets a Jira label or Fix Version.** Increments map directly to Jira: use `fixVersion = "M1.1"` or labels `m1-inc-1`.
-2. **Sprint planning starts from Increments, not Epics.** The question is "what does Inc 1.3 need to demo?" — not "which epics are in W1?"
-3. **Milestone gates are go/no-go.** M1 gate: all three Increment demos pass. M2 gate: 24h parity on three tenants. No partial credit.
+2. **Sprint planning starts from Increments, not Epics.** The question is "what does Inc 2.1 need to demo?" — not "which epics are in W1?"
+3. **Milestone gates are go/no-go.** M1 gate: all Increment demos pass. M2 gate: all four Increment demos pass + 24h parity on three tenants. No partial credit.
 4. **The full epic map lives in doc 15.** This doc defines the structure. [Doc 15](15-overall-status.md) contains the live status of every epic mapped to its Milestone, Increment, and Capability tag.
 
 ---
