@@ -97,22 +97,22 @@ For Pricer's scale, this is overkill. Backstage TechDocs uses **MkDocs** under t
 ┌──────────────────────────────────────────────────────────┐
 │               evo-docs (doc hub repo)                    │
 │  ┌──────────────────────────────────────────────────┐    │
-│  │  mkdocs.yml  ←  defines nav, theme, plugins     │    │
-│  │  docs/                                          │    │
-│  │    index.md           "Pricer Documentation"    │    │
-│  │    _sources/          (cloned by CI script)     │    │
+│  │  mkdocs.yml  ←  defines nav, theme, plugins      │    │
+│  │  docs/                                           │    │
+│  │    index.md           "Pricer Documentation"     │    │
+│  │    _sources/          (cloned by CI script)      │    │
 │  │      evo-dtoflow-protos/docs/                    │    │
 │  │      replatforming-onboarding/docs/              │    │
 │  │      platform-item-registry-api/docs/            │    │
 │  │      ... (one dir per doc-source repo)           │    │
-│  └──────────────────────────────────────────────────┘
-│                                                         │
-│  scripts/sync-repos.sh                                  │
-│    → clones all doc-source repos into _sources/         │
-│  Dockerfile                                             │
-│    → nginx serving the mkdocs build output              │
-│  .github/workflows/build-and-deploy.yml                 │
-│    → sync repos → mkdocs build → deploy to Cloud Run    │
+│  └──────────────────────────────────────────────────┘    │
+│                                                          │
+│  scripts/sync-repos.sh                                   │
+│    → clones all doc-source repos into _sources/          │
+│  Dockerfile                                              │
+│    → nginx serving the mkdocs build output               │
+│  .github/workflows/build-and-deploy.yml                  │
+│    → sync repos → mkdocs build → deploy to Cloud Run     │
 └──────────────────────────────────────────────────────────┘
                        ▲
                        │ docs/ folders sourced from
@@ -357,6 +357,46 @@ Minimal — just serve the static mkdocs output.
 
 ---
 
+## 12. Success Criteria: What "Done" Looks Like
+
+Each phase has concrete, testable exit criteria. No phase is "done" until every checkbox is checked.
+
+> **Note on metrics:** Phase 3+ criteria referencing "70%+ of engineers accessed docs" and "Slack questions reduced 20%" require instrumentation not yet in place (Google Analytics on the deployed site, a Slack audit baseline). These are tracked starting in Phase 3 when the site has enough content and traffic to make measurement meaningful. For Phase 1-2, use the concrete checklist items (deployed, CI passing, pages rendering) as the definition of done.
+
+### Phase 1 — Foundation (Week 1-2)
+
+- [ ] `evo-dtoflow-protos` docs branch found and merged to `main`
+- [ ] `evo-docs` hub repo populated: `mkdocs.yml`, Dockerfile, CI pipeline, sync script
+- [ ] Hub deployed to Cloud Run behind IAP — accessible only to `@pricer.com` accounts
+- [ ] 3 pilot repos have `docs/index.md` + `mkdocs.yml`
+- [ ] All 4 doc sources (protos + 3 pilots) render correctly on the deployed hub
+- [ ] CI pipeline runs `mkdocs build --strict` and fails on broken links
+
+### Phase 2 — Confluence Migration (Week 2-4)
+
+- [ ] All identified Confluence pages exported to Markdown
+- [ ] Cross-reference links validated and functional (no broken internal links)
+- [ ] Confluence space marked read-only with banner: "Docs moved to docs.pricer.com"
+- [ ] `replatforming-onboarding` repo created with all 15+ onboarding docs
+- [ ] Onboarding doc cross-references rewritten for mkdocs-compatible paths
+
+### Phase 3 — Full Rollout (Week 4-8)
+
+- [ ] 100% of Tier 1-2 repos have `docs/` folder
+- [ ] `docs.pricer.com` indexes all registered repos
+- [ ] Stale content detection workflow active (weekly scan, 90-day threshold)
+- [ ] PR template with docs checklist active on all doc-source repos
+- [ ] 70%+ of engineers have accessed the docs site in the last 30 days
+
+### Phase 4 — Living Documentation (Ongoing)
+
+- [ ] <10% of pages unchanged for >90 days
+- [ ] 90%+ of PRs touching APIs include doc updates
+- [ ] Support "how does X work?" questions in Slack reduced 20% vs. baseline
+- [ ] Doc PR review time <48 hours (median)
+
+---
+
 ## 7. Repo Prioritization
 
 Not all 50 repos need full docs. Priority tiers:
@@ -472,9 +512,12 @@ One paragraph explaining this service's role in the Pricer platform.
 
 | Risk | Mitigation |
 |------|------------|
-| **Devs don't update docs** | Make docs part of the PR template: "Did you update docs?" |
+| **Devs don't update docs** | PR template with mandatory docs checklist ([doc 18](18-docs-github-implementation.md)); `mkdocs build --strict` in per-repo CI |
+| **PMs/designers can't contribute** (Git/Markdown intimidating) | Two contribution paths: GitHub web UI edit button for quick changes, issue-based workflow for complex changes ([doc 18 §9](18-docs-github-implementation.md)) |
 | **Broken links between repos** | `mkdocs build --strict` in CI; daily rebuild catches breakage |
-| **Docs diverge from reality** | Daily CI rebuild from source repos; stale docs = broken build |
+| **External links break silently** (vendors change URLs) | Add `mkdocs-linkcheck` or lychee to monthly maintenance ([doc 18 §7.4](18-docs-github-implementation.md)) |
+| **Docs become stale (>90 days unchanged)** | Weekly GitHub Action scans for stale pages, auto-creates issues with owner assignment ([doc 18 §7.2](18-docs-github-implementation.md)) |
+| **Docs diverge from reality** | Daily CI rebuild from source repos; stale content detection flags pages >90 days unchanged |
 | **Confluence has useful comments/attachments** | Export relevant content during migration; link to archive |
 | **Docs contain internal architecture details** | Deploy behind Cloud Run + IAP — only `@pricer.com` Google accounts can access |
 | **CI clone-script fails on private repos** | Use a GitHub App or deploy key with read access to all doc-source repos |

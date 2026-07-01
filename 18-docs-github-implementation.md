@@ -1400,7 +1400,103 @@ The daily CI build handles:
 
 If the daily build fails, GitHub Actions sends a notification. Check the logs for the failing step.
 
-### 7.2 Weekly Maintenance (Manual — 5 minutes)
+### 7.2 Weekly Maintenance — Stale Content Detection (Automated)
+
+Add this GitHub Actions workflow to `evo-docs` to automatically flag docs that haven't been updated in 90+ days. It runs every Monday morning and creates an issue if any pages are stale.
+
+`.github/workflows/detect-stale-docs.yml`:
+
+```yaml
+name: Detect Stale Docs
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly Monday 9am UTC
+  workflow_dispatch:        # Manual trigger for ad-hoc checks
+
+jobs:
+  stale-detection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token (for cross-repo clone access)
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DOCS_APP_ID }}
+          private-key: ${{ secrets.DOCS_APP_PRIVATE_KEY }}
+
+      - name: Sync source repos (need full content to scan)
+        run: |
+          chmod +x scripts/sync-repos.sh
+          ./scripts/sync-repos.sh
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Find stale docs
+        run: |
+          CUTOFF_DATE=$(date -d '90 days ago' +%s)
+          echo "Checking for docs unchanged since $(date -d '90 days ago' '+%Y-%m-%d')..."
+          > stale-report.txt
+
+          # Scan _sources/ (cloned repos) + docs/ (hub pages)
+          for dir in _sources docs; do
+            find "$dir" -name '*.md' -type f 2>/dev/null | while read file; do
+              # Get last Git commit date for this file
+              LAST_MODIFIED=$(git log -1 --format=%ct -- "$file" 2>/dev/null)
+              if [ -z "$LAST_MODIFIED" ]; then
+                # File not tracked by Git yet — skip
+                continue
+              fi
+              if [ "$LAST_MODIFIED" -lt "$CUTOFF_DATE" ]; then
+                echo "STALE: $file (last modified $(git log -1 --format=%ci -- "$file"))" >> stale-report.txt
+              fi
+            done
+          done
+
+          STALE_COUNT=$(wc -l < stale-report.txt | tr -d ' ')
+          echo "Found $STALE_COUNT stale pages"
+          cat stale-report.txt
+
+      - name: Create issue if stale docs found
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const staleReport = fs.readFileSync('stale-report.txt', 'utf8').trim();
+            if (!staleReport) {
+              console.log('No stale docs found — all pages updated within 90 days.');
+              return;
+            }
+
+            const staleCount = staleReport.split('\n').length;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `📚 ${staleCount} stale doc page(s) detected (${new Date().toISOString().split('T')[0]})`,
+              body: `The following pages have not been updated in 90+ days. Please review and either:\n\n- **Update** the content if it's outdated\n- **Add a comment** in the file explaining why the page is still current\n- **Close this issue** if the page is intentionally evergreen (e.g., core architecture principles)\n\n\`\`\`\n${staleReport}\n\`\`\`\n\n> Automated by the [stale doc detection workflow](.github/workflows/detect-stale-docs.yml). Runs every Monday.`,
+              labels: ['documentation', 'stale-content']
+            });
+```
+
+**What it does:**
+- Runs every Monday at 9am UTC
+- Clones all doc-source repos via `sync-repos.sh`
+- Scans every `.md` file under `_sources/` and `docs/`
+- Flags files whose last Git commit was >90 days ago
+- Creates a single GitHub issue listing all stale pages, tagged `stale-content`
+- If no stale pages found, exits silently
+
+**Note:** This workflow requires `fetch-depth: 0` if the hub repo uses shallow clones, and the `sync-repos.sh` step must use full clones (not `--depth 1`) for accurate Git history. If shallow clones are preferred for speed, use file modification time (`stat`) instead:
+
+```bash
+# Alternative: use file mtime instead of git log (works with shallow clones)
+CUTOFF_TIMESTAMP=$(date -d '90 days ago' +%s)
+find _sources docs -name '*.md' -type f -newermt '90 days ago' -print  # find fresh files
+```
+
+### 7.3 Weekly Maintenance (Manual — 5 minutes)
 
 ```bash
 cd evo-docs
@@ -1426,7 +1522,7 @@ curl -sI "https://evo-docs-xxxxx-oc.a.run.app" | head -1
 # Should return: HTTP/2 200
 ```
 
-### 7.3 Monthly Maintenance (Manual — 15 minutes)
+### 7.4 Monthly Maintenance (Manual — 15 minutes)
 
 ```bash
 # 1. Check for mkdocs-material updates
@@ -1520,6 +1616,66 @@ gcloud run services update-traffic evo-docs \
 
 # 3. Fix the issue in evo-docs and push
 ```
+
+---
+
+## 9. Contribution Workflows
+
+Three paths for different types of contributors. The principle: no one should need to learn Git to contribute documentation.
+
+### Scenario A: Developer — docs alongside code
+
+1. Developer makes a code change (e.g., adds an API endpoint)
+2. In the same branch, updates `docs/api.md` with the new endpoint
+3. Runs `mkdocs serve` locally to preview
+4. Opens a PR — the PR template ([Appendix C](#appendix-c-pull-request-template)) auto-populates with the doc checklist
+5. CI runs `mkdocs build --strict` — fails if links are broken
+6. CODEOWNERS auto-assigns the service owner for review
+7. After approval → merge. Daily hub rebuild picks up the change.
+
+### Scenario B: Non-technical contributor (PM, designer, support)
+
+Two paths — no Git CLI required for either.
+
+**Path 1 — Quick edit (typo fix, add a paragraph):**
+
+1. Navigate to the `.md` file on GitHub (e.g., `PricerAB/platform-link-service/docs/index.md`)
+2. Click the **pencil icon** (✏️) — GitHub opens a web editor
+3. Make changes in Markdown. Preview with the "Preview" tab.
+4. At the bottom, select **"Create a new branch"** and click **"Propose changes"**
+5. GitHub auto-creates a PR. In the description, `@team-platform-core` for review.
+6. A platform team member reviews and merges.
+
+No local Git, no clone, no terminal. Just a browser.
+
+**Path 2 — Issue-based (new page, structural change, or unsure about Markdown):**
+
+1. Create a GitHub issue in the appropriate repo with the `documentation` label
+2. Describe:
+   - What needs to be documented
+   - Where it should live (which repo, which section)
+   - Any relevant links (code, Slack threads, existing Confluence pages)
+3. Tag `@team-platform-core` — they convert the issue into a PR
+4. The platform team writes the Markdown, opens a PR, and requests your review before merging
+
+### Scenario C: Brand-new service docs
+
+1. Copy the template from `evo-docs/templates/repo-docs-template/` (to be created in Phase 3 — for now, use the manual steps in [§3.1](#31-step-by-step))
+2. Fill in `docs/index.md` (what/why/how — see [§3.1 Step 2](#step-2-write-docsindexmd))
+3. Add `mkdocs.yml` with minimal config
+4. Commit to `main`
+5. Add the repo name to `evo-docs/repos.txt`
+6. Add category mapping in `evo-docs/scripts/generate-nav.py` → `CATEGORY_MAP`
+7. Next hub rebuild auto-includes the new service
+
+### Quick Reference: Which Path to Use
+
+| Who | What | Path |
+|-----|------|------|
+| Developer | Doc alongside code change | Scenario A — same branch, same PR |
+| PM / Designer | Small fix (typo, paragraph) | Scenario B, Path 1 — GitHub web UI edit |
+| PM / Designer | New page or structural change | Scenario B, Path 2 — create issue |
+| Anyone | Brand-new service docs | Scenario C — template + registration |
 
 ---
 
@@ -1661,6 +1817,54 @@ When setting up the platform, create these files in order:
 - [ ] `evo-docs/.gitignore` (§2.11)
 - [ ] Push evo-docs → verify CI deploy succeeds
 - [ ] First source repo added → verify it appears on the site
+
+## Appendix C: Pull Request Template
+
+> Add this as `.github/pull_request_template.md` in every doc-source repo. It auto-populates every PR description. Doc-specific checklist ensures docs aren't forgotten.
+
+```markdown
+## Description
+
+<!-- Brief description of changes. Delete this line when done. -->
+
+## Type of Change
+
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation only
+- [ ] Refactor (no behavior change)
+- [ ] Infrastructure / CI
+
+## Documentation Checklist
+
+<!-- Required for any PR that changes API, config, or behavior. Delete if docs-only PR. -->
+
+- [ ] `docs/` updated (if API, config, or behavior changed)
+- [ ] Ran `mkdocs build --strict` locally — no broken links
+- [ ] Cross-references updated (if files moved or renamed)
+- [ ] Code examples in docs tested and working
+- [ ] New/changed behavior explained in plain language (assume reader is new)
+
+## Testing
+
+- [ ] Tested locally with `mkdocs serve`
+- [ ] Verified all internal links resolve
+- [ ] If new API endpoint: request/response examples tested with `curl` or similar
+
+## Screenshots (if UI change)
+
+<!-- Drag and drop screenshots here. Delete section if not applicable. -->
+```
+
+**Where to add this template:**
+
+| Repo Tier | Action |
+|-----------|--------|
+| Tier 1 (evo-docs, evo-dtoflow-protos, replatforming-onboarding) | Add `.github/pull_request_template.md` immediately |
+| Tier 2 (all Cloud Run services) | Add during Phase 3 rollout |
+| Tier 3+ | Optional — add if repo has `docs/` folder |
+
+**How it works:** Once the file exists at `.github/pull_request_template.md`, GitHub automatically fills every new PR description with this template. Contributors fill in the relevant sections and delete the rest. The doc checklist is not enforced by CI (it's a cultural norm), but the `mkdocs build --strict` check in per-repo CI ([§3.1 Step 4](#step-4-add-ci-validation-optional-but-recommended)) catches broken links automatically.
 
 ---
 

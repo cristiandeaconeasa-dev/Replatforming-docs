@@ -43,6 +43,26 @@ The `pricer-server` subscribes to `renderedimage.v1` (not `eslimage.v1`). The re
 
 ---
 
+## Phase & Epic Overlay
+
+> **Bridging architecture and delivery:** Each flow below maps to specific Milestones, Increments, and epics from the delivery framework ([doc 15](15-overall-status.md), [doc 00](00-replatforming-program-overview.md)). Use this table to connect "how the pipes work" (this doc) with "what we're building when" (the delivery docs).
+
+| # | Flow | Phase / Milestone | Relevant Increment | Key Epics | Gate Status |
+|---|------|-------------------|-------------------|-----------|-------------|
+| **1** | Studio Item Update | **P0** validated via Shadow Mode · **P1** needed for cloud-native path | Inc 2.1 (export pipe) · M3 Inc 1 (item APIs) | PLT-2483 (storeitemvalues export), PLT-2651 (item validation), PLT-2378 (Patch APIs) | 🟡 P0: export pipe Ready for Deploy. 🔴 P1: item pipeline gated by PLT-2651 + PLT-2378 |
+| **2** | ECC Item Update | **P0** Shadow Mode ECC rendering · **P2** full feature parity | Inc 2.1 (ECC data pipes) · Inc 2.2 (ECC rendering support) | PLT-2494/2495 (ECC export pipes), PLT-2359 (ECC rendering support, building early) | 🟡 In Progress — ECC Shadow Mode rendering being validated |
+| **3** | Link → Render (Studio) | **P0** operational | Inc 2.2 (Shadow Mode orchestration) | PLT-2294 (Closed), PLT-2354 (Shadow Mode orchestration) | 🟢 Live end-to-end — the most mature flow |
+| **4** | Link → Render (ECC) | **P0** operational | Inc 2.2 (Shadow Mode completion) | PLT-2773 (Closed), PLT-2771 (Closed), PLT-2359 (Inc 2.2) | 🟢 Live — ecclink-projector + ecc-renderer operational |
+| **5** | Design Publication | **P0** operational | Inc 2.2 (Shadow Mode validation) | PLT-2354 (Shadow Mode orchestration) | 🟢 Live — mass re-render via ReEnqueue fan-out |
+
+**How to read this table:**
+- **🟢 Live** = flow works end-to-end today in Shadow Mode (label transmit dropped)
+- **🟡 In Progress** = partially operational; epics actively being built
+- **🔴 Gated** = blocked by one or more unassigned/blocked epics
+- See [doc 15 §8](15-overall-status.md#8-executive-summary) for the program-at-a-glance status of all flows
+
+---
+
 ## 1. Studio Item Update Flow
 
 **Trigger:** `item-registry` writes a new `storeitemvalues` DTO (price change, property update, etc.)
