@@ -17,18 +17,22 @@ DTOflow is purely **event-driven** and **decentralized**. There is no central or
 
 **Key principle:** A single DTO write fans out to ALL subscribers in parallel. When `storeitemvalues` changes, both `studio-link-evaluator` AND `studio-renderer` receive the notification — they run concurrently, not sequentially. There is no "shortcut" or "bypass" — every subscriber gets every notification for the DTO types it registered.
 
-### Current CQS queue subscriptions
+### Current event subscriptions
 
-> Source: `evo-dtoflow-protos` central-documentation, `poc-changequeue-service/src/main/resources/application.yml`
+> Source: Actual service code — `CqsSubscriptionManager.java` (evaluator), `routes/dtoflow-event.ts` (renderer), plus live Pub/Sub push configs.
 
-| Queue (service) | Subscribed DTO types |
-|---|---|
-| `studio-renderer` | `studiolink.v1`, `storeitemvalues.v1`, `design.v1`, `storeesl.v1`, `canvasdesign.v1`, `designerlink.v1` |
-| `studio-link-evaluator` | `communicationpack.v1`, `link.v2`, `storeitemvalues.v1` |
-| `pricer-server` | `eslimage.v1`, `storeesl.v1` |
-| `link-registry` | `link.v1` (legacy bridge only) |
+| Service | Ingestion | Subscribed DTO types |
+|---|---|---|
+| `studio-link-evaluator` | **CQS pull** | `communicationpack.v1`, `link.v2`, `storeitemvalues.v1` |
+| `platform-image-render-service` | **Pub/Sub push** (HTTP endpoint) | `designerlink.v1`, `storeitemvalues.v1`, `design.v1`, `canvasdesign.v1`, `storeesl.v1` |
+| `pricer-server` | **CQS pull** | `renderedimage.v1`, `storeesl.v1` |
+| `link-registry` | CQS pull | `link.v1` (legacy bridge only) |
+| `ecc-link-projector` | CQS pull | `link.v2` |
+| `ecc-image-render-service` | CQS pull | `ecclink.v1` (`by_storeesl` alias) |
 
-Note that `studio-renderer` and `studio-link-evaluator` **both** subscribe to `storeitemvalues.v1`. An item change triggers both services in parallel. The renderer also subscribes to `studiolink.v1` — so if the evaluator produces a new studiolink, the renderer gets a *second* trigger.
+**Key differences from the evaluator:** The renderer (`platform-image-render-service`, TypeScript) does **not** use CQS. It receives Pub/Sub push events via an HTTP endpoint — a different ingestion model from the evaluator's CQS long-polling. The evaluator and renderer both react to `storeitemvalues.v1` changes, but through different mechanisms. The renderer reads `designerlink.v1` (not `studiolink.v1`) — a bridge service converts `studiolink.v1` to `designerlink.v1` before the renderer sees it.
+
+The `pricer-server` subscribes to `renderedimage.v1` (not `eslimage.v1`). The renderer writes directly to the `renderedimage` DTO. The `studioeslimage.v1` → `esl-image-merger` → `eslimage.v1` path is the **target architecture** (PLT-2487 image split), not what runs today.
 
 ### Diagram conventions
 
@@ -64,21 +68,17 @@ flowchart TD
     SR -->|reads| DSN[("design.v1")]
     SR -->|reads| SESL[("storeesl.v1")]
     STL -.->|if changed, 2nd trigger| SR
-    SR -->|writes| SEI[("studioeslimage.v1")]
+    SR -->|writes| SEI[("renderedimage.v1")]
     
-    SEI -.->|subscribed| EIM[esl-image-merger]
-    EIM -->|reads| ECE[("ecceslimage.v1")]
-    EIM -->|writes| ESI[("eslimage.v1")]
-    
-    ESI -.->|subscribed| PS[pricer-server]
+    SEI -.->|subscribed| PS[pricer-server]
     PS -->|reads| SESL
     PS -->|writes| STS[("storeeslstatus.v1")]
     PS -->|transmit| ESL[ESL hardware]
 
     classDef svc fill:#AED6F1,stroke:#2E86C1,color:#1a1a1a
     classDef dto fill:#A9DFBF,stroke:#1E8449,color:#1a1a1a
-    class IR,SLE,SR,EIM,PS,ESL svc
-    class SIV,CP,LV2,STL,DSN,SESL,SEI,ECE,ESI,STS dto
+    class IR,SLE,SR,PS,ESL svc
+    class SIV,CP,LV2,STL,DSN,SESL,SEI,STS dto
 ```
 
 **Walkthrough:**

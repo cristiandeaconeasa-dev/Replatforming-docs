@@ -1,6 +1,6 @@
 # Link Pipeline — Deep Dive
 > **End-to-end analysis of how item-to-label associations flow from creation to ESL display**
-> **Last validated:** 2026-06-25 against GCP `platform-dev-p01`, Jira epics, and repository analysis
+> **Last validated:** 2026-07-01 — **Code-verified** against `PricerAB/platform-evaluation-engine` (Java) and `PricerAB/platform-image-render-service` (TypeScript). Corrections: evaluator uses CEL tree-walking with accumulated && expressions, forced_design_id bypass, mass re-evaluation on CommunicationPack change. Renderer uses Pub/Sub push (not CQS), writes `renderedimage.v1` (not `studioeslimage.v1`). Architecture diagram updated.
 
 ---
 
@@ -21,8 +21,9 @@ flowchart TB
     subgraph Studio["Studio Path"]
         SLE[studio-link-evaluator]
         STL[("studiolink.v1")]
-        SR[studio-renderer]
-        SEI[("studioeslimage.v1")]
+        DL[("designerlink.v1")]
+        SR[platform-image-render-service]
+        RDI[("renderedimage.v1")]
     end
 
     subgraph ECC["ECC Path"]
@@ -44,8 +45,8 @@ flowchart TB
     LR -->|writes| SESL
     LR -->|writes| LV2
 
-    LV2 -.->|subscribed| SLE
-    LV2 -.->|subscribed| ELP
+    LV2 -.->|CQS| SLE
+    LV2 -.->|CQS| ELP
 
     SLE -->|reads| CP
     SLE -->|reads| SIV
@@ -53,27 +54,32 @@ flowchart TB
 
     ELP -->|writes| ECL
 
-    STL -.->|subscribed| SR
-    ECL -.->|subscribed| ECCR
+    SR -.->|Pub/Sub push| DL
+    SR -.->|Pub/Sub push| DSN
+    SR -.->|Pub/Sub push| SIV
+    SR -.->|Pub/Sub push| SESL
+    DL -.->|Pub/Sub push| SR
+    ECL -.->|CQS| ECCR
 
     SR -->|reads| DSN
     SR -->|reads| SIV
     SR -->|reads| SESL
-    SR -->|writes| SEI
+    SR -->|writes| RDI
 
     ECCR -->|writes| EEI
 
-    SEI -.->|subscribed| EIM
-    EEI -.->|subscribed| EIM
+    EEI -.->|CQS| EIM
     EIM -->|writes| ESI
 
-    ESI -.->|subscribed| PS
+    ESI -.->|CQS| PS
     PS -->|transmit| ESL
+
+    Note["⚠️ platform-image-render-service uses Pub/Sub push (HTTP), not CQS.<br/>It writes renderedimage.v1. The bridge from studiolink →<br/>designerlink and renderedimage → studioeslimage/eslimage<br/>is under investigation."]
 
     classDef svc fill:#AED6F1,stroke:#2E86C1,color:#1a1a1a
     classDef dto fill:#A9DFBF,stroke:#1E8449,color:#1a1a1a
     class LR,SLE,SR,ELP,ECCR,EIM,PS,ESL svc
-    class SESL,LV2,CP,SIV,STL,DSN,SEI,ECL,EEI,ESI dto
+    class SESL,LV2,CP,SIV,STL,DSN,DL,RDI,ECL,EEI,ESI dto
 ```
 
 **Current status:** ✅ **Fully live.** Link-registry, link-bfg, link-storeasset-bfg, studio-link-evaluator, ecc-link-projector, and esl-image-merger are all deployed and operational.
@@ -228,9 +234,17 @@ Body: {
 **What it does:**
 - Subscribes to `storeitemvalues.v1`, `link.v2`, and `communicationpack.v1` via CQS
 - When a link is created/changed or item data changes, fetches the relevant `link.v2`, `communicationpack`, and `storeitemvalues`
-- Evaluates CEL (Common Expression Language) rules from communication packs against live item data
-- Determines the winning design for each ESL page
-- If the evaluation result differs from the current `studiolink`, writes a new one; if unchanged, writes nothing
+- **Tree-walking algorithm:** depth-first traverses the CommunicationPack scenario tree:
+  - Each scenario's `cel_expression` is accumulated with `&&` from parent nodes
+  - Child scenarios are tried first — **first match wins**
+  - If no children match, the current node's expression is evaluated against three variable maps: `item` (custom properties), `link` (location, facings), `device` (ESL type from barcode)
+  - A **pre-check** scans the CEL expression with regex and returns `false` if any referenced property is missing from the maps — preventing silent failures
+  - If expression evaluates `true`, returns that scenario's `design_ids`
+- **Forced designs:** If `forced_design_id` is set on the link, uses it directly — **no CEL evaluation** (manual override)
+- Resolves design IDs to full Spanner keys: `t/{tenantId}/designs/{id}`
+- Filters by **ESL type compatibility** — the design's `compatible_esltype_ids` must include the ESL's type
+- If the evaluation result differs from the current `studiolink.design_id`, writes a new `studiolink.v1`; if unchanged, writes nothing (idempotency gate)
+- **Mass re-evaluation on CommunicationPack change:** reads ALL tenant links and re-evaluates every studio link — the most expensive operation. Uses `putMany()` for batch writes.
 
 **Evaluation logic:**
 ```
@@ -317,11 +331,13 @@ Studio/Designer ──→ Apigee ──→ link-registry ──→ Spanner (writ
   │
   └──→ Pub/Sub link.v2 ──→ CQS ──→ studio-link-evaluator (evaluate)
                                           │
-                                          └──→ write studiolink ──→ Pub/Sub ──→ CQS ──→ studio-renderer (render design + item)
-                                                                                          │
-                                                                                          └──→ write studioeslimage ──→ Pub/Sub ──→ CQS
-                                                                                                                                      │
-                                                                                                                                      └──→ esl-image-merger ──→ dtoflow-transmission
+                                          ├── forced_design_id? → skip CEL
+                                          └── depth-first traverse scenario tree
+                                              └──→ write studiolink ──→ (projector?) → designerlink ──→ Pub/Sub Push
+                                                                                                      │
+                                                                                                      └──→ platform-image-render-service (fabric.js render)
+                                                                                                                      │
+                                                                                                                      └──→ write renderedimage.v1 ──→ (bridge?) → eslimage → transmission
 ```
 
 **Status:** ✅ End-to-end live. All services in the chain are operational.
@@ -333,16 +349,19 @@ Item Pipeline writes storeitemvalues.v1 → Pub/Sub fans out to all subscribers
                                           │
                     ┌─────────────────────┴─────────────────────┐
                     ▼                                             ▼
-        studio-link-evaluator                          studio-renderer
-        (subs: storeitemvalues.v1)                     (subs: storeitemvalues.v1)
+        studio-link-evaluator (CQS)                  platform-image-render-service (Pub/Sub push)
+        (subs: storeitemvalues.v1)                   (handles: designerlink, storeitemvalues, design, canvasdesign, storeesl)
                     │                                             │
-        Fetch link.v2 (by_item alias)                Fetch current studiolink,
-        Fetch communicationpack                       design, storeitemvalues
-        Re-evaluate CEL rules                         Render with existing design
+        Fetch link.v2 (by_item alias)                Fetch current designerlink, design JSON from LFS,
+        Fetch communicationpack                       storeitemvalues, font DTOs
+        Depth-first traverse scenario tree            fabric.js: parse SVG, apply propertyMappings,
+        with accumulated && CEL expressions            render canvas → PNG
                     │                                             │
-        If winning design changed:                    Write studioeslimage
-          Write new studiolink ──────────────────→    Renderer gets 2nd trigger
-                                                     (re-renders with new design)
+        If winning design changed:                    Write renderedimage.v1 to Spanner
+          Write new studiolink.v1 ──────────────→    (plus upload PNG to LFS)
+        (forced_design_id bypasses CEL)               
+                                                     Renderer may get 2nd trigger if
+                                                     designerlink is updated from new studiolink
 ```
 
 **Status:** ✅ Link evaluation is live. Both evaluator and renderer subscribe to `storeitemvalues.v1` and run in parallel.

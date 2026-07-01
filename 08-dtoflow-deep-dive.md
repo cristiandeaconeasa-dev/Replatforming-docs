@@ -2,7 +2,7 @@
 > **The cloud data backbone of the Replatforming platform**
 > **2026-06-29 correction:** CQS descriptions corrected throughout — it is a subscription-based fan-out layer with no routing logic of its own. Services self-configure their subscriptions. Architecture and section 8 diagrams updated to remove arrows that implied CQS routes to specific services.
 >
-> **2026-06-30 validation:** Jira statuses refreshed against live PLT project. PLT-2483 now **Ready for Deploy** (Johan Ekman). PLT-1870 in **Test** (Daniel Pettersson). PLT-2354 moved to **In Progress**.
+> **2026-07-01 code correction:** §3 CQS diagram updated — `studio-renderer` removed from CQS subscribers. The actual service (`platform-image-render-service`) uses Pub/Sub push via HTTP endpoint, not CQS pull. Confirmed against code in both `platform-image-render-service` (TypeScript) and `platform-evaluation-engine` (Java).
 
 ---
 
@@ -177,19 +177,24 @@ flowchart LR
         SORT["Priority Sort<br/>(by SLA timestamp)"]
     end
 
-    subgraph workers["Worker Services"]
+    subgraph workers["CQS Worker Services"]
         EV["studio-link-evaluator<br/>(subs: commpack, link.v2, storeitemvalues)"]
-        RN["studio-renderer<br/>(subs: studiolink, storeitemvalues, design, storeesl, canvasdesign)"]
         ECC["ecc-image-render-service<br/>(subs: ecclink, storeitemvalues, eccfont, eccmodel, eccparameters)"]
         TX["pricer-server<br/>(subs: eslimage, storeesl)"]
+    end
+
+    subgraph push["Pub/Sub Push Workers"]
+        RN["platform-image-render-service<br/>(HTTP: designerlink, storeitemvalues,<br/>design, canvasdesign, storeesl)"]
     end
 
     PS -->|drain topics| Q
     Q --> SORT
     SORT -->|notify| EV
-    SORT -->|notify| RN
     SORT -->|notify| ECC
     SORT -->|notify| TX
+    PS -.->|"push (HTTP POST)"| RN
+
+    Note["⚠️ platform-image-render-service uses Pub/Sub push<br/>via HTTP, NOT CQS. It does not appear in CQS queues."]
 ```
 
 **Status:** 🟡 In Progress (Johan Ekman, PLT-169). GKE cluster `platform` is running. CQS client integration in R3Server (PLT-1870, Daniel Pettersson) is in **Test**.

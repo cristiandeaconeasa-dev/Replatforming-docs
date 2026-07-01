@@ -37,7 +37,7 @@ flowchart TB
         direction TB
         IR["item-registry(-api)"]
         LR["link-registry / link-bfg"]
-        ST["studio-renderer / -link-evaluator /<br/>-design-library / -scenario-library"]
+        ST["platform-image-render-service / studio-link-evaluator /<br/>studio-design-library / studio-scenario-library"]
         ECCs["ecc-renderer / ecc-link-projector /<br/>esl-image-merger"]
         ACT["actions-executor / -library"]
         TXC["dtoflow-transmission"]

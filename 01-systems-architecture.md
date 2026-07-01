@@ -240,7 +240,7 @@ Even today, a lot already lives in GCP project **`platform-dev-p01`** (`europe-n
 - **GKE** cluster `platform` (europe-north1-a, running) — hosts the **ChangeQueueService**.
 - **GCS** — `dtoflow-data-*`, `dtoflow-lfs-*`, `dtoflow-dlq-*`, `item-registry-requests-*`.
 
-Most of these map 1:1 to GitHub repos in the `PricerAB` org (e.g. `platform-item-registry-api`, `platform-dtoflow-server-spanner`, `platform-changequeue-service`, `platform-designer-service`, `platform-evaluation-engine`, `platform-ecc-link-projector`, `platform-esl-image-merger`, `evo-dtoflow-grpc-clients-{java,node}`). Full deep dive in [doc 03](03-replatforming-deep-dive.md) and [doc 04](04-target-architecture.md).
+Most of these map 1:1 to GitHub repos in the `PricerAB` org (e.g. `platform-item-registry-api`, `platform-dtoflow-server-spanner`, `platform-changequeue-service`, `platform-image-render-service`, `platform-evaluation-engine`, `platform-ecc-link-projector`, `platform-esl-image-merger`, `evo-dtoflow-grpc-clients-{java,node}`). Full deep dive in [doc 03](03-replatforming-deep-dive.md) and [doc 04](04-target-architecture.md).
 
 ---
 

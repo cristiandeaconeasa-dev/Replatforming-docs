@@ -41,14 +41,14 @@ Every epic carries a **Capability tag** — `[C1]` through `[C5]` — for archit
 
 ## 2. The Milestones
 
-| Milestone | Phase | Goal | Increments | Gate |
-|-----------|-------|------|-------------|------|
-| **M1: Platform Foundation** | P0 | Core infrastructure live and certified | 3 | All three Increment demos pass |
-| **M2: Shadow Mode Validation** | P0 | Cloud pipeline runs in parallel with edge. Zero label risk. | 3 | 24h parity across three tenants confirmed |
-| **M3: First Tenant Go-Live** | P1 | Item and link API traffic cut over to cloud | 3 | One real tenant live for basic flows |
-| **M4: Production Hardening** | P1 | Monitoring, load testing, DR, runbooks | 3 | All ops gates passed |
-| **M5: Feature Parity** | P2 | Timed updates, ECC sync, autoscaling, SLAs | TBD | Feature parity with R3Server achieved |
-| **M6: Full Migration** | P2 | All tenants migrated | TBD | All tenants on cloud |
+| Milestone | Phase | Goal | Increments | Gate | Target |
+|-----------|-------|------|-------------|------|--------|
+| **M1: Platform Foundation** | P0 | Core infrastructure live and certified | 3 | All three Increment demos pass | **W30** (Jul 26) |
+| **M2: Shadow Mode Validation** | P0 | Cloud pipeline runs in parallel with edge. Zero label risk. | 3 | 24h parity across three tenants confirmed | **W34** (Aug 23) |
+| **M3: First Tenant Go-Live** | P1 | Item and link API traffic cut over to cloud | 3 | One real tenant live for basic flows | **W44** (Nov 1) |
+| **M4: Production Hardening** | P1 | Monitoring, load testing, DR, runbooks | 3 | All ops gates passed | **W50** (Dec 13) |
+| **M5: Feature Parity** | P2 | Timed updates, ECC sync, autoscaling, SLAs | TBD | Feature parity with R3Server achieved | 2027 |
+| **M6: Full Migration** | P2 | All tenants migrated | TBD | All tenants on cloud | 2027 |
 
 ### Current State
 
@@ -78,11 +78,11 @@ M1 and M2 are active. M3 is gated by two blocked epics (PLT-2651, PLT-2378). M4 
 
 ## 3. Phase 0: M1 — Platform Foundation
 
-| Inc | Name | Demo | Status |
-|-----|------|------|--------|
-| **1.1** | Core Event Routing | Dummy DTO → CQS → Cloud Run queue | 🟡 Active |
-| **1.2** | Cloud/Edge Bridge | R3Server receives from cloud CQS | 🟡 Active |
-| **1.3** | Production Ingress & Security | URL-path routing → PSC → private Cloud Run | 🟡 Not started |
+| Inc | Name | Demo | Status | Target |
+|-----|------|------|--------|--------|
+| **1.1** | Core Event Routing | Dummy DTO → CQS → Cloud Run queue | 🟡 Active | **W29** (Jul 19) |
+| **1.2** | Cloud/Edge Bridge | R3Server receives from cloud CQS | 🟡 Active | **W29** (Jul 19) |
+| **1.3** | Production Ingress & Security | URL-path routing → PSC → private Cloud Run | 🟡 Not started | **W30** (Jul 26) |
 
 ### Increment 1.1: Core Event Routing
 
@@ -112,11 +112,11 @@ M1 and M2 are active. M3 is gated by two blocked epics (PLT-2651, PLT-2378). M4 
 
 ## 4. Phase 0: M2 — Shadow Mode Validation
 
-| Inc | Name | Demo | Status |
-|-----|------|------|--------|
-| **2.1** | Core Data Tap | Price update in R3 → all DTOs in Spanner | 🟡 Active |
-| **2.2** | Shadow Execution & Studio Parity | Item change → cloud render → transmit dropped | 🟡 Active |
-| **2.3** | Multi-Tenant Shadow Validation | 24h parity on 3 tenants | 🔵 Not started |
+| Inc | Name | Demo | Status | Target |
+|-----|------|------|--------|--------|
+| **2.1** | Core Data Tap | Price update in R3 → all DTOs in Spanner | 🟡 Active | **W28** (Jul 12) |
+| **2.2** | Shadow Execution & Studio Parity | Item change → cloud render → transmit dropped | 🟡 Active | **W31** (Aug 2) |
+| **2.3** | Multi-Tenant Shadow Validation | 24h parity on 3 tenants | 🔵 Not started | **W34** (Aug 23) |
 
 ### Increment 2.1: Core Data Tap
 
@@ -148,7 +148,7 @@ No discrete epics. This Increment is a validation gate: run Shadow Mode on Repla
 
 ## 5. Phase 1 Preview: M3 & M4
 
-> **Increment decomposition pending.** Each Milestone will have 3 Increments (M3: Item+Link APIs → Security & Isolation → Tenant Switch; M4: Monitoring → Load Test → DR + Runbook). Epics listed below are flat until the Increment mapping is finalised. The two blocked epics in M3 are the highest-priority action in the program today.
+> **Increment decomposition and week targets for M3 and M4 are defined in [doc 17](17-phase-1-plan.md#10-key-activities--milestones).** M3: Inc 1 (Item+Link APIs) → W38, Inc 2 (Security & Isolation) → W40, Inc 3 (Tenant Switch) → W44. M4: Inc 1 (Monitoring) → W42, Inc 2 (Load Test) → W46, Inc 3 (DR & Runbook) → W50. Epics listed below are flat until the Increment mapping is finalised. The two blocked epics in M3 are the highest-priority action in the program today.
 
 ### M3: First Tenant Go-Live
 
@@ -252,13 +252,13 @@ All services deployed in GCP project `platform-dev-p01`, region `europe-north1`.
 
 ### Program at a Glance
 
-| Milestone | Status | Key Signal |
-|-----------|--------|------------|
-| **M1: Platform Foundation** | 🟡 Active | CQS (1.1) In Progress; Edge Bridge (1.2) in Test; Ingress (1.3) not started |
-| **M2: Shadow Mode Validation** | 🟡 Active | 2 data pipes Ready for Deploy (2.1); Shadow orchestration In Progress (2.2) |
-| **M3: First Tenant Go-Live** | 🔴 Gated | 2 blocked & unassigned epics — highest-priority action in the program |
-| **M4: Production Hardening** | 🔵 Not started | All 11 epics in Backlog |
-| **M5: Feature Parity** | 🔵 Not started | 19 epics in Backlog; one with early progress |
+| Milestone | Status | Key Signal | Target |
+|-----------|--------|------------|--------|
+| **M1: Platform Foundation** | 🟡 Active | CQS (1.1) In Progress; Edge Bridge (1.2) in Test; Ingress (1.3) not started | **W30** (Jul 26) |
+| **M2: Shadow Mode Validation** | 🟡 Active | 2 data pipes Ready for Deploy (2.1); Shadow orchestration In Progress (2.2) | **W34** (Aug 23) |
+| **M3: First Tenant Go-Live** | 🔴 Gated | 2 blocked & unassigned epics — highest-priority action in the program | **W44** (Nov 1) |
+| **M4: Production Hardening** | 🔵 Not started | All 11 epics in Backlog | **W50** (Dec 13) |
+| **M5: Feature Parity** | 🔵 Not started | 19 epics in Backlog; one with early progress | 2027 |
 
 ### Key End-to-End Flows
 

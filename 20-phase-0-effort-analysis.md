@@ -183,21 +183,18 @@ Three factors make mid-August unlikely with current estimates:
 
 3. **No buffer for the validation gate.** Inc 2.3 (Multi-Tenant Shadow Validation) has zero epics and isn't tracked in Jira. It requires 24+ hours on each of 3 tenants back-to-back. If image parity fails on any tenant, the clock resets. Realistically, this gate needs 5–7 working days after PLT-2354 is code-complete.
 
-### Realistic timeline with corrections
+### Realistic timeline with corrections (target end weeks)
 
-```
-Week 27 (Jul 1-4):   Assign owners. Reassign PLT-2101. Set estimates.
-Week 28 (Jul 7-11):  PLT-169 finishes. Export pipes (2483, 2494, 2496, 2495) close.
-Week 29 (Jul 14-18): PLT-2792, 2478, 2336 close. PLT-2354 skeleton phase. *(Sreekanth closing two epics in one week — both already In Progress but any delay in either pushes the week.)*
-Week 30 (Jul 21-25): PLT-2354 parallel run + parity validation phase.
-Week 31 (Jul 28-Aug 1): PLT-2354 multi-tenant phase. Begin Inc 2.3.
-Week 32 (Aug 4-8):   Inc 2.3 validation — 3 tenants × 24h. Bug fixes.
-Week 33 (Aug 11-15): Buffer week. Parity re-runs. Final sign-off.
-                      ↑ MID-AUGUST DEADLINE
-Week 34 (Aug 18-22): If slip: final parity + Phase 0 close. ← REALISTIC
-```
-
-**Most likely close: Week 33–34 (Aug 11–22).** Mid-August is the optimistic end of the range. Late August is the realistic midpoint.
+| Week | Date | Milestone / Increment Target |
+|------|------|------------------------------|
+| W27 | Jul 1-4 | Assign owners. Reassign PLT-2101. Set estimates. |
+| **W28** | Jul 7-11 | **Inc 2.1 target.** PLT-169 finishes. Export pipes (2483, 2494, 2496, 2495) close. |
+| **W29** | Jul 14-18 | **Inc 1.1 + 1.2 target.** PLT-2792, 2478, 2336 close. PLT-2354 skeleton phase. |
+| **W30** | Jul 21-25 | **Inc 1.3 + M1 target.** PLT-2354 parallel run + parity validation phase. |
+| **W31** | Jul 28-Aug 1 | **Inc 2.2 target.** PLT-2354 multi-tenant phase. Begin Inc 2.3. |
+| W32 | Aug 4-8 | Inc 2.3 validation — 3 tenants × 24h. Bug fixes. |
+| W33 | Aug 11-15 | Buffer week. Parity re-runs. Final sign-off. |
+| **W34** | Aug 17-23 | **Inc 2.3 + M2 + Phase 0 target.** ← REALISTIC |
 
 ---
 

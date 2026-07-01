@@ -1,6 +1,6 @@
 # Rendering Pipeline — Deep Dive
 > **End-to-end analysis of how label images are generated from designs and item data**
-> **Last validated:** 2026-06-25 against GCP `platform-dev-p01`, Jira epics, and repository analysis
+> **Last validated:** 2026-07-01 — **Code-verified** against `PricerAB/platform-image-render-service` (TypeScript), `PricerAB/platform-evaluation-engine` (Java), and `PricerAB/evo-dtoflow-protos`. Corrections: repo name, event ingestion (Pub/Sub push not CQS), rendering pipeline (fabric.js + property mappings), DTO subscriptions (designerlink.v1 not studiolink.v1), output DTO (renderedimage.v1).
 
 ---
 
@@ -18,7 +18,9 @@ flowchart TB
     LV2[("link.v2")]
     CP[("communicationpack.v1")]
     DSN[("design.v1")]
+    CDS[("canvasdesign.v1")]
     SESL[("storeesl.v1")]
+    DL[("designerlink.v1")]
     ECM[("eccmodel.v1")]
     ECP[("eccparameters.v1")]
     ECF[("eccfont.v1")]
@@ -26,8 +28,8 @@ flowchart TB
     subgraph Studio["Studio Path"]
         SLE[studio-link-evaluator]
         STL[("studiolink.v1")]
-        SR[studio-renderer]
-        SEI[("studioeslimage.v1")]
+        SR[platform-image-render-service]
+        RDI[("renderedimage.v1")]
     end
 
     subgraph ECC["ECC Path"]
@@ -43,35 +45,37 @@ flowchart TB
     PS[pricer-server]
     ESL[ESL hardware]
 
-    SIV -.->|subscribed| SLE
-    SIV -.->|subscribed| SR
-    SIV -.->|subscribed| ECCR
-    LV2 -.->|subscribed| SLE
-    LV2 -.->|subscribed| ELP
-    STL -.->|subscribed| SR
-    DSN -.->|subscribed| SR
-    SESL -.->|subscribed| SR
-    ECL -.->|subscribed| ECCR
+    SIV -.->|CQS| SLE
+    LV2 -.->|CQS| SLE
+    LV2 -.->|CQS| ELP
+    SIV -.->|Pub/Sub push| SR
+    DSN -.->|Pub/Sub push| SR
+    CDS -.->|Pub/Sub push| SR
+    SESL -.->|Pub/Sub push| SR
+    DL -.->|Pub/Sub push| SR
+    SIV -.->|CQS| ECCR
+    ECL -.->|CQS| ECCR
     ECM -.->|read| ECCR
     ECP -.->|read| ECCR
     ECF -.->|read| ECCR
-    SEI -.->|subscribed| EIM
-    EEI -.->|subscribed| EIM
-    ESI -.->|subscribed| PS
+    EEI -.->|CQS| EIM
+    ESI -.->|CQS| PS
     
     SLE -->|writes| STL
-    SR -->|writes| SEI
-    SR -->|uploads| LFS
+    SR -->|writes| RDI
+    SR -->|uploads PNG| LFS
     ELP -->|writes| ECL
     ECCR -->|writes| EEI
     ECCR -->|uploads| LFS
     EIM -->|writes| ESI
     PS -->|transmit| ESL
 
+    Note["⚠️ platform-image-render-service uses Pub/Sub push (HTTP), not CQS pull.<br/>It writes renderedimage.v1 — the bridge to studioeslimage/eslimage<br/>is under investigation (see §2.1)."]
+
     classDef svc fill:#AED6F1,stroke:#2E86C1,color:#1a1a1a
     classDef dto fill:#A9DFBF,stroke:#1E8449,color:#1a1a1a
     class SLE,SR,ELP,ECCR,EIM,PS,ESL svc
-    class SIV,LV2,CP,DSN,SESL,STL,SEI,ECL,ECM,ECP,ECF,EEI,ESI dto
+    class SIV,LV2,CP,DSN,CDS,SESL,DL,STL,RDI,ECL,ECM,ECP,ECF,EEI,ESI dto
 ```
 
 **Current status:** ✅ **Fully live.** Studio rendering, ECC rendering, design library, ecc-link-projector, and esl-image-merger all operational.
@@ -101,16 +105,20 @@ Rendering is the process of combining **item data** (price, name, properties) wi
 | **Rendered Image** | The output — a pixel-accurate image ready for transmission to a specific ESL |
 | **LFS** | Large File Service (GCS-backed) — stores rendered images that exceed Spanner's size limits |
 
-### Rendering Pipeline Stages
+### Rendering Pipeline Stages (code-verified)
 
 ```
-1. Input Collection: Gather item data + design template + ESL type constraints
-2. Layout Composition: Place fields (price, name, barcode) at design-specified positions
-3. Image Rendering: Generate pixel-accurate bitmap for the target ESL screen
-4. Post-Processing: Apply color mapping, dithering, format conversion (RGB → 1-bit for e-ink)
-5. Storage: Write renderedimage to Spanner (metadata) + LFS (large payload)
-6. Notification: Publish renderedimage change event to Pub/Sub
-7. Dispatch: CQS routes rendered image to dtoflow-transmission → R3Server → ESL
+1. Pub/Sub Push: Receive dtoflow-change event via HTTP endpoint (POST /dtoflow-event)
+2. DTO Read: Fetch designerlink from Spanner → extract designId + itemId + ESL info
+3. Item Data: Fetch storeitemvalues from Spanner → convert customProperties to key:value map
+4. Design Load: Read design DTO → get jsonFilePath → fetch design JSON from LFS (GCS)
+5. SVG Parse: Parse SVG/Fabric JSON via fabric.js canvas
+6. Property Substitution: Apply propertyMappings — substitute item.Price, item.Name, etc. into SVG text elements by element ID
+7. Font Registration: Load fonts from DTOflow font DTOs
+8. Canvas Render: Add all fabric objects → canvas.renderAll() → toDataURL('image/png')
+9. Post-Processing: Apply dithering if design contains images (color reduction for e-paper); sharp rotate 90° if needed
+10. Storage: Write PNG to LFS (renderer/t/{tenantId}/eslimages/{sha256}.png); write renderedimage.v1 DTO to Spanner
+11. Notification: DTO write triggers Pub/Sub event for downstream consumers (merger → transmission)
 ```
 
 ---
@@ -119,55 +127,52 @@ Rendering is the process of combining **item data** (price, name, properties) wi
 
 ### 2.1 studio-renderer (Cloud Run)
 
-**Service:** `studio-renderer` — the primary rendering engine for Designer/Canvas designs.
+**Service:** `platform-image-render-service` — the primary rendering engine for Designer/Canvas designs.
 
 | Aspect | Detail |
 |--------|--------|
 | **Role** | Canvas/Studio label rendering |
 | **Status** | ✅ **Live** |
-| **Repository** | `PricerAB/platform-designer-service` |
+| **Repository** | `PricerAB/platform-image-render-service` |
+| **Stack** | **Node.js / TypeScript** (not Java) |
 
 **What it does:**
-- Receives render requests from CQS (triggered by item changes or link changes)
-- Fetches the design template from `studio-design-library`
-- Fetches current item data from `storeitemvalues` in Spanner
-- Fetches the target ESL type specifications from `esltype` table
-- Composes the label: places each field (price, name, barcode, promo badge) at the position specified by the design
-- Renders the composite image at the correct resolution for the target ESL
-- Writes the result to `renderedimage` table in Spanner
-- Stores large image payloads in LFS (GCS)
-- Publishes `dtoflow-changes-renderedimage.v1` event
+- Receives render triggers via **Pub/Sub push** (HTTP endpoint `POST /dtoflow-event`) — **not CQS pull**
+- Handles 6 DTO types: `designerlink.v1` (primary), `storeitemvalues.v1` (re-render affected links), `design.v1` (re-render affected links), `canvasdesign.v1` (floating canvas re-render), `storeesl.v1` (delete rendered images on ESL removal), `link.v1` (legacy — logged, ignored)
+- Fetches design JSON directly from **LFS (GCS)** via the `jsonFilePath` field on the design DTO — does **not** call `studio-design-library`
+- Fetches current item data from `storeitemvalues` in Spanner, converts to `{key: value}` property map
+- Uses **fabric.js** to parse SVG/Fabric JSON designs and render to a canvas
+- Applies **property mappings** — substitutes item properties (e.g. `item.Price`, `item.Name`, `link.facings`) into SVG text elements by element ID
+- Registers fonts from DTOflow font DTOs before rendering
+- Applies **dithering** if the design contains images (color reduction for e-paper displays)
+- Handles **rotation** via sharp (90° rotate if needed)
+- Writes PNG output to **LFS**: `renderer/t/{tenantId}/eslimages/{sha256}.png`
+- Writes `renderedimage.v1` DTO to Spanner (metadata + LFS reference)
+- Supports **floating canvas** (multi-ESL): renders one large combined image, splits into per-ESL segments via sharp based on ESL widths + bezel margin
+- **Fallback design**: if rendering fails (missing design, corrupted JSON, missing item data), renders a default design with warning header
 
-**Rendering pipeline inside studio-renderer:**
+**Rendering pipeline inside platform-image-render-service:**
 ```
-Input: designId, itemId, eslTypeId
+Input: designerlink DTO (contains designId + ESL info)
 
-1. Load design template (studio-design-library)
-   └── Field positions, font sizes, colors, field types (text, barcode, image)
-
-2. Load item data (storeitemvalues from Spanner)
-   └── Price, product name, promotion text, barcode value, custom properties
-
-3. Load ESL type specs (esltype from Spanner)
-   └── Screen width (px), height (px), dpi, color depth (1-bit, grayscale, color)
-
-4. Layout engine
-   └── For each field in design:
-       ├── Text field: render text with specified font, size, color at position
-       ├── Barcode field: generate barcode image (EAN-13, QR, etc.) at position
-       └── Image field: load image asset, scale and place at position
-
-5. Render output
-   └── Convert to ESL-native format (e.g., 1-bit e-ink bitmap)
-   └── Apply dithering if needed (grayscale to 1-bit)
-
-6. Store
-   └── Write renderedimage to Spanner
-   └── If image > Spanner limit, store payload in LFS
-
-7. Publish event
-   └── dtoflow-changes-renderedimage.v1
+1. Read designerlink → extract designId, itemId, ESL barcode
+2. Read storeitemvalues → customProperties → {key: value} map
+3. Read design DTO → jsonFilePath → fetch design JSON from LFS
+   └── Design JSON contains svgDesign.svgBase64Encoded (SVG or Fabric JSON)
+4. Parse SVG/Fabric JSON via fabric.js
+5. Apply propertyMappings to substitute item data into text elements
+   └── Example: element id="price-text" → text content = item.Price
+   └── Supports text, image, and dynamic-image mapping types
+6. Register fonts (from DTOflow font DTOs)
+7. Create Fabric Canvas → add all fabric objects → canvas.renderAll()
+   └── canvas.toCanvasElement().toDataURL('image/png')
+8. Apply dithering if design contains images (color reduction for e-paper)
+9. Handle rotation (sharp rotate 90° if needed)
+10. Write PNG to LFS: renderer/t/{tenantId}/eslimages/{sha256}.png
+11. Write renderedimage.v1 DTO to Spanner
 ```
+
+> **⚠️ Output DTO chain note:** The code writes `renderedimage.v1`, but the downstream pipeline documented elsewhere references `studioeslimage.v1` → `esl-image-merger` → `eslimage.v1`. The relationship between `renderedimage` and `studioeslimage` needs further investigation — there may be an intermediary conversion service not yet identified, or the output DTO naming may have been simplified in documentation.
 
 ---
 
@@ -219,11 +224,13 @@ Input: designId, itemId, eslTypeId
 
 **Scenario evaluation flow:**
 ```
-1. CQS sends render request with item data
-2. studio-link-evaluator checks if link has a scenario reference
-3. If yes: scenario-library evaluates conditions against current item data
-4. Returns the winning design template
-5. studio-renderer renders the winning design with item data
+1. Item data changes → Pub/Sub publishes storeitemvalues.v1 event
+2. studio-link-evaluator (CQS subscriber) fetches the item's links via by_item alias
+3. Loads CommunicationPack, traverses scenario tree depth-first with CEL expressions
+4. If a scenario matches: writes the winning design_id to studiolink.v1
+5. Separately, platform-image-render-service (Pub/Sub push subscriber) receives the storeitemvalues change
+6. Renderer independently fetches designerlink, design JSON from LFS, storeitemvalues, and renders
+7. If the evaluator produced a new studiolink → designerlink updated → renderer gets a 2nd Pub/Sub push trigger
 ```
 
 ---
@@ -239,10 +246,12 @@ Input: designId, itemId, eslTypeId
 
 Covered in detail in the [Link Pipeline Deep Dive](./11-link-pipeline-deep-dive.md). Key rendering relevance:
 
-- When an item price changes, the evaluator checks which links use that item
-- For each affected link, it checks if the linked design includes the changed field (e.g., if only "warehouse location" changed, labels showing "price" don't need re-render)
-- Returns the filtered list of links that need re-rendering to CQS
-- CQS dispatches rendering jobs to studio-renderer
+- When item data changes, the evaluator fetches all links for that item via `by_item` Spanner alias
+- For each link: loads the CommunicationPack, traverses the scenario tree depth-first with accumulated `&&` CEL expressions
+- If `forced_design_id` is set on the link: uses it directly — no CEL evaluation
+- If the winning design differs from current `studiolink.design_id`: writes a new `studiolink.v1` to Spanner (idempotency gate)
+- On CommunicationPack change: mass re-evaluates every studio link in the tenant
+- Writes `studiolink.v1` to Spanner — does **not** "return to CQS" or dispatch render jobs. The renderer (`platform-image-render-service`) subscribes independently via Pub/Sub push and reacts in parallel.
 
 ---
 
@@ -254,7 +263,7 @@ Covered in detail in the [Link Pipeline Deep Dive](./11-link-pipeline-deep-dive.
 |--------|--------|
 | **Role** | ECC label rendering |
 | **Status** | ✅ **Live** |
-| **Repository** | `PricerAB/platform-ecc-renderer` |
+| **Repository** | `PricerAB/platform-ecc-renderer` (Java) |
 
 **What it does:**
 - Renders labels using **ECC models** — the legacy template system
@@ -366,12 +375,15 @@ The `dtoflow` database contains these rendering-related tables:
 |-------|---------|---------|
 | `eccimage` | ECC base image assets | ecc-renderer |
 
-**Rendered image schema:**
+**Rendered image schema (code-verified):**
+
+The `renderedimage` DTO is the **actual output** of `platform-image-render-service`. The protobuf definition lives in `evo-dtoflow-protos/renderedimage.v1.proto`.
+
 ```sql
 CREATE TABLE renderedimage (
   dto_type STRING(MAX) NOT NULL,  -- "renderedimage"
-  id STRING(MAX) NOT NULL,        -- unique image identifier
-  DATA BYTES(MAX),                -- protobuf: image metadata + payload or LFS reference
+  id STRING(MAX) NOT NULL,        -- unique image identifier (SHA256-based)
+  DATA BYTES(MAX),                -- protobuf: image metadata + LFS reference
   checksum INT64,
 ) PRIMARY KEY(dto_type, id);
 ```
@@ -388,12 +400,14 @@ message RenderedImage {
   int32 height_px = 7;
   int32 dpi = 8;
   bytes image_data = 9;       // May be empty if stored in LFS
-  string lfs_reference = 10;  // Reference if stored in LFS
+  string lfs_reference = 10;  // Reference if stored in LFS: renderer/t/{tenantId}/eslimages/{sha256}.png
   string format = 11;         // "PNG", "1-bit", "e-ink"
   int64 rendered_at = 12;
   string checksum = 13;
 }
 ```
+
+> **⚠️ Relationship to studioeslimage:** The existing architecture documentation shows `studioeslimage.v1` → `esl-image-merger` → `eslimage.v1` → `pricer-server` as the downstream transmission chain. The renderer code writes `renderedimage.v1` — the bridge between these two DTO types (if both exist) has not been verified in code. This may indicate a separate projector/converter service, or the docs may reference an earlier naming convention.
 
 ---
 
@@ -420,30 +434,27 @@ sequenceDiagram
     Item->>Item: write storeitemvalues.v1
     Note over Item,SLE: Pub/Sub fans out to all subscribers in parallel
     
-    par Evaluator Path
+    par Evaluator Path (CQS pull)
         Item-->>SLE: storeitemvalues changed
         SLE->>SLE: fetch link.v2 (by_item),<br/>communicationpack, storeitemvalues
-        SLE->>SLE: re-evaluate CEL rules
+        SLE->>SLE: depth-first traverse scenario tree<br/>accumulate && CEL expressions
         alt evaluation unchanged
             Note over SLE: no studiolink written — path ends
-        else evaluation changed
+        else evaluation changed (or forced_design_id)
             SLE->>SLE: write new studiolink.v1
         end
-    and Renderer Path (always runs)
-        Item-->>SR: storeitemvalues changed
-        SR->>SR: fetch current studiolink, design,<br/>storeitemvalues, storeesl
-        SR->>DL: get design template
-        DL-->>SR: design definition
-        SR->>SR: compose layout, render pixels
-        SR->>SR: upload PNG to LFS, write studioeslimage.v1
+    and Renderer Path (Pub/Sub push, always runs)
+        Item-->>SR: storeitemvalues changed (HTTP POST)
+        SR->>SR: fetch current designerlink, design JSON from LFS,<br/>storeitemvalues, font DTOs
+        SR->>SR: fabric.js: parse SVG, apply propertyMappings,<br/>render canvas → PNG
+        SR->>SR: upload PNG to LFS, write renderedimage.v1
     end
     
-    opt Evaluator produced new studiolink
-        SLE-->>SR: studiolink changed (2nd trigger)
-        SR->>SR: re-render with new design<br/>(may produce duplicate work)
+    opt Evaluator produced new studiolink → designerlink projector
+        Note over SLE,SR: designerlink updated → renderer gets 2nd trigger<br/>(may produce duplicate work)
     end
     
-    SR-->>EIM: studioeslimage changed
+    Note over SR,EIM: renderedimage → (bridge?) → studioeslimage → merger
     EIM->>EIM: merge with ecceslimage (if any)
     EIM->>EIM: write eslimage.v1
     EIM-->>PS: eslimage changed
@@ -486,8 +497,8 @@ A new design is created and linked to an item. The first render happens immediat
 3. link-registry publishes link.v2 event
    └── CQS picks up → dispatches render
 
-4. studio-renderer renders the label
-   └── Fetches design → fetches item data → renders → stores → publishes event
+4. platform-image-render-service renders the label
+   └── Fetches designerlink, design JSON from LFS, item data → fabric.js render → writes renderedimage.v1
 
 5. dtoflow-transmission dispatches to store
    └── R3Server transmits to ESL
@@ -531,10 +542,10 @@ When a chain runs a promotion, thousands of labels may need re-rendering simulta
 2. Each item change triggers link evaluation
    └── studio-link-evaluator identifies affected links
 
-3. CQS queues rendering jobs
-   └── Prioritization ensures critical updates first
+3. Pub/Sub push delivers events to platform-image-render-service
+   └── Each event triggers a render via fabric.js pipeline
 
-4. studio-renderer processes render queue
+4. platform-image-render-service processes render requests
    └── May scale horizontally on Cloud Run
 
 5. Each rendered image dispatched to its store
@@ -617,10 +628,10 @@ flowchart TB
 
     subgraph processing["Processing"]
         F["studio-link-evaluator ✅"]
-        G["studio-renderer ✅"]
+        G["platform-image-render-service ✅"]
         H["ecc-renderer ✅"]
-        I["ecc-link-projector 🟡"]
-        J["esl-image-merger 🟡"]
+        I["ecc-link-projector 🟢"]
+        J["esl-image-merger 🟢"]
     end
 
     subgraph output["Output"]
@@ -747,7 +758,7 @@ Future: Single rendering pipeline
 
 | Component | Status | What's Left |
 |-----------|--------|-------------|
-| **studio-renderer** | ✅ **Live** | Nothing — primary rendering pipeline operational |
+| **platform-image-render-service** | ✅ **Live** | Nothing — primary rendering pipeline operational (TypeScript) |
 | **studio-design-library** | ✅ **Live** | Nothing — design storage works |
 | **studio-scenario-library** | ✅ **Live** | Nothing — conditional scenarios work |
 | **studio-link-evaluator** | ✅ **Live** | Nothing — link evaluation works (details in Link Pipeline doc) |
