@@ -6,7 +6,7 @@
 >
 > **Validated:** 2026-06-30 — against live Jira (`project = PLT`, all critical epics), GCP `platform-dev-p01`, the onboarding doc set (docs 01–16), the Confluence Architecture Pipeline Status page, and the architect's Phase 1 Activity Planning Confluence page.
 >
-> **Companion docs:** [03 — Replatforming Deep Dive](03-replatforming-deep-dive.md) (epic backlog, Shadow Mode, phase model) · [04 — Target Architecture](04-target-architecture.md) (topology, hybrid boundary) · [13 — Core Data Flows](13-core-data-flows.md) (event-driven flows) · [14 — Tenant Migration](14-tenant-migration.md) (switch procedure) · [15 — Overall Status](15-overall-status-v2.md) (Framework C workstream→capability mapping).
+> **Companion docs:** [03 — Replatforming Deep Dive](03-replatforming-deep-dive.md) (epic backlog, Shadow Mode, phase model) · [04 — Target Architecture](04-target-architecture.md) (topology, hybrid boundary) · [13 — Core Data Flows](13-core-data-flows.md) (event-driven flows) · [14 — Tenant Migration](14-tenant-migration.md) (switch procedure) · [15 — Overall Status](15-overall-status.md) (Phase → Milestone → Increment → Epic hierarchy) · [19 — Delivery Framework](19-dimension-frameworks.md).
 
 ---
 
@@ -15,8 +15,10 @@
 **Phase 1 is the first time a real, revenue-generating customer runs on the DTOflow cloud platform.** It follows Phase 0 (internal Shadow Mode validation) and precedes Phase 2 (full feature parity, many tenants).
 
 ```mermaid
+---
 config:
     layout: elk
+---
 flowchart LR
     P0["Phase 0<br/>Internal tenants<br/>Shadow Mode<br/>Zero label risk"] --> P1["Phase 1<br/>First real tenant<br/>Feature delivery + ops<br/>Controlled risk"]
     P1 --> P2["Phase 2<br/>Scale<br/>Full feature parity<br/>All tenants"]
@@ -30,7 +32,7 @@ flowchart LR
     style P2 fill:#ffebee,stroke:#c62828,color:#000
 ```
 
-**The current state (2026-06-30):** The DTOflow foundation is solid — 21 Cloud Run services deployed, link and rendering pipelines live, transmission operational. But Phase 1 is **gated on two unblocked epics** (PLT-2651 item property validation, PLT-2378 Item Patch APIs — both Blocked and Unassigned) and **one unstarted mechanism** (PLT-2101 per-API-path routing). The first tenant hasn't been formally selected (PLT-2601 in Backlog).
+**The current state (2026-06-30):** The DTOflow foundation is solid — 21 Cloud Run services deployed, link and rendering pipelines live, transmission operational. But Phase 1 is **gated on two blocked epics** (PLT-2651 item property validation, PLT-2378 Item Patch APIs — both Blocked and Unassigned) and **one unstarted mechanism** (PLT-2101 per-API-path routing). The first tenant hasn't been formally selected (PLT-2601 in Backlog).
 
 **This document answers:** What exactly constitutes "Phase 1 done," organised around six activity areas defined by the architect — DTOflow Platform Maturity, Feature Delivery, Security & Tenant Isolation, Operational Readiness, Validation & Go-Live Confidence, and Migration of PROD Tenants.
 
@@ -70,6 +72,8 @@ Phase 1 cannot start until Phase 0 crosses these gates.
 | **PLT-2274** | SIC Support | 🔴 **Blocked** (Daniel Pettersson) | Depends on PLT-2378. SIC lets items be found by the customer's own Store Item Code. If the Phase 1 tenant's ERP identifies items by SIC, this is mandatory for item lookup. **Needs scoping** — some tenants may use Pricer item IDs exclusively; verify during tenant selection (PLT-2601). |
 
 > **Why these are the highest-priority actions in the entire Replatforming program right now:** Without them, no real tenant item data flows through DTOflow. The link and render pipelines already work — but they have nothing to process if items can't be validated and written. SIC is tenant-dependent but must be assessed before committing to a Phase 1 target. **Assigning owners to PLT-2651 and PLT-2378 is the single most leveraged action a lead can take this week.**
+>
+> These prerequisites close **M1 (Platform Foundation)** and **M2 (Shadow Mode Validation)** in [doc 15](15-overall-status.md). Once M2 is complete, Phase 1 work on M3 and M4 begins.
 
 ### 3.2 Shadow Mode Gate (PLT-2354)
 
@@ -115,8 +119,10 @@ Phase 1 cannot start until Phase 0 crosses these gates.
 > **Source:** These six areas and their acceptance criteria are defined by the Replatforming architect in the [Phase 1 Activity Planning](https://pricer-org.atlassian.net/wiki/x/LAD8XwI) Confluence page (2026-06-30). The gap analysis, proposed solutions, and migration sequencing in subsequent sections are derived from the onboarding doc set and live Jira/GCP data.
 
 ```mermaid
+---
 config:
     layout: elk
+---
 flowchart TB
     A1["1. DTOflow Platform Maturity<br/>Hardening core infrastructure"]
     A2["2. Feature Delivery<br/>API parity with on-prem"]
@@ -241,7 +247,7 @@ PLT-170 (Write Protection / Auth0 JWT) provides fine-grained write authorization
 
 ## 5. Phase 1 Feature Summary — What the First Tenant Gets
 
-Based on the architect's six areas, mapped to Framework C (Workstream → Capability):
+Based on the architect's six areas, mapped to M3 (First Tenant Go-Live) and M4 (Production Hardening), with `[C1]`–`[C5]` capability tags:
 
 | Feature | Cloud Path | Phase 1 Area | Jira Status |
 |---------|-----------|-------------|-------------|
@@ -251,7 +257,7 @@ Based on the architect's six areas, mapped to Framework C (Workstream → Capabi
 | **Link deletion → label revert** | `link-registry` → delete → evaluator → re-render → transmission | Area 2 | 🟢 Already live |
 | **Design publication → mass re-render** | `studio-design-library` → design.v1 → renderer + evaluator → merger → transmission | Area 2 | 🟢 Already live |
 | **Timed item updates** | `item-registry-api` → scheduled write → CQS → downstream | Area 2 | 🔵 Backlog (PLT-2350) |
-| **Flash promotions** | `item-registry-api` → flash trigger → CQS → transmission → R3Server → ESL | Area 2 | 🟡 Stays on R3Server edge by design |
+| **Flash promotions** | Cloud-originated trigger → sub-second execution on R3Server edge | Area 2 | 🟡 Cloud trigger only; actual flash stays on R3Server edge |
 | **Segment label support** | Evaluator + renderer support for 7-segment labels | Area 2 | 🔵 Backlog (PLT-2361) |
 | **Tenant isolation (security)** | Cross-tenant read prevention; M2M write enforcement | Area 3 | 🔵 Backlog (PLT-2578, PLT-170) |
 | **Monitoring & alerting** | CQS queue depth, Spanner latency, error rates dashboards | Area 4 | 🔵 Backlog (PLT-2579) |
@@ -498,117 +504,129 @@ These are the identified gaps between current state and Phase 1 readiness, organ
 
 ---
 
-## 10. Key Activities & Workstreams
+## 10. Key Activities & Milestones
 
-Phase 1 breaks down into five logical workstreams, sequenced by dependency and mapped to the architect's six areas.
+Phase 1 maps to two Milestones — **M3: First Tenant Go-Live** and **M4: Production Hardening** — each with three Increments. These supersede the five Workstreams from earlier versions of this plan.
 
 ```mermaid
+---
 config:
     layout: elk
+---
 flowchart TB
-    subgraph WS1["Workstream 1: Close Phase 0 & Foundation (Areas 1, 3)"]
-        W1A["Unblock PLT-2651 + PLT-2378"]
-        W1B["Complete Shadow Mode on Dev tenants"]
-        W1C["PLT-2101: per-API-path routing"]
-        W1D["PLT-2578: tenant isolation verified"]
+    subgraph M3["M3: First Tenant Go-Live"]
+        direction LR
+        I31["Inc 1<br/>Item+Link APIs<br/>(Areas 1, 2)"]
+        I32["Inc 2<br/>Security & Isolation<br/>(Area 3)"]
+        I33["Inc 3<br/>Tenant Switch<br/>(Areas 5, 6)"]
     end
 
-    subgraph WS2["Workstream 2: Ops Foundation (Area 4)"]
-        W2A["PLT-171: SLA/trackingId"]
-        W2B["PLT-2579: Monitoring & Dashboards"]
-        W2C["PLT-2576: Load Testing"]
-        W2D["PLT-2599: Cutover Runbook"]
+    subgraph M4["M4: Production Hardening"]
+        direction LR
+        I41["Inc 1<br/>Monitoring<br/>(Area 4)"]
+        I42["Inc 2<br/>Load Test<br/>(Area 5)"]
+        I43["Inc 3<br/>DR + Runbook<br/>(Area 4)"]
     end
 
-    subgraph WS3["Workstream 3: Tenant Onboarding (Area 6)"]
-        W3A["PLT-2601: Select first tenant"]
-        W3B["PLT-2572: Store Onboarding"]
-        W3C["PLT-2575: Store DTO Schema"]
-        W3D["PLT-2600: Studio Readiness"]
-    end
+    I31 --> I32
+    I32 --> I33
+    I33 --> I41
+    I41 --> I42
+    I42 --> I43
 
-    subgraph WS4["Workstream 4: Feature Delivery & Validation (Areas 2, 5)"]
-        W4A["Implement tenant-specific features"]
-        W4B["24hr+ image parity validation"]
-        W4C["API call parity + integration tests"]
-    end
-
-    subgraph WS5["Workstream 5: The Switch (Area 6)"]
-        W5A["Rehearse switch on Phase 0 tenant"]
-        W5B["Execute 7-step switch procedure"]
-        W5C["Post-cutover hypercare (2 weeks)"]
-    end
-
-    WS1 --> WS2
-    WS1 --> WS3
-    WS2 --> WS4
-    WS3 --> WS4
-    WS4 --> WS5
-
-    style WS1 fill:#ffcdd2,stroke:#c62828,color:#000
-    style WS2 fill:#fff3e0,stroke:#f57c00,color:#000
-    style WS3 fill:#fff3e0,stroke:#f57c00,color:#000
-    style WS4 fill:#e3f2fd,stroke:#1565c0,color:#000
-    style WS5 fill:#e8f5e9,stroke:#2e7d32,color:#000
+    style M3 fill:#fff3e0,stroke:#f57c00,color:#000
+    style M4 fill:#e3f2fd,stroke:#1565c0,color:#000
 ```
 
-### Workstream 1: Close Phase 0 & Foundation (Areas 1, 3)
+> Activities that close Phase 0 gates (Shadow Mode completion, per-API-path routing, tenant isolation proofs) are prerequisites to M3 and are covered in the Phase 0 status doc ([15](15-overall-status.md)). This section focuses on work that starts once M2 (Shadow Mode Validation) closes.
 
-| Step | What | Why First |
-|------|------|-----------|
-| 1a | **Assign PLT-2651, PLT-2378, and assess PLT-2274** | All three are on the item pipeline critical path. PLT-2651 and PLT-2378 are Blocked and Unassigned — they gate ALL item-driven flows. PLT-2274 (SIC) is tenant-dependent: determine during PLT-2601 whether the tenant's ERP uses SIC or Pricer item IDs. |
-| 1b | **Implement PLT-2651** — item property validation | Write a JSON schema or CEL-based validation in `item-registry`. All item writes must pass validation before Spanner persistence. This is a well-scoped, single-story task. |
-| 1c | **Implement PLT-2378** — Item Patch APIs | Wire up the Item Service to accept `PATCH/DELETE /api/public/core/v1/items` and `PATCH/DELETE /api/public/multi-store/v2/multi-store-requests/items`. Both Plaza Mobile and Central-Manager depend on this. |
-| 1d | **Assign the 5 Shadow Mode export sub-tasks** | PLT-2494 (ECC params), PLT-2495 (ECC fonts), PLT-2492 (ESL status), PLT-2488 (itemproperties), PLT-2714 (itemproperties startup). |
-| 1e | **Reassign PLT-2101** (API routing) | Saikiran is on vacation. Reassign to someone who can start immediately (Sreekanth S.U. handles PSC/Apigee and is a natural fit). |
-| 1f | **Prove tenant isolation (PLT-2578)** | Automated tests: Tenant A's Spanner reads must never return Tenant B's data. Missing `t/{tenantId}` prefix = hard failure. |
-| 1g | **Complete Shadow Mode on all 3 Phase 0 tenants** | Replatforming-Dev → Evo-Se → Application-Stage. 24+ hours each with 100% image parity. |
+### M3 Inc 1: Item & Link APIs Live (Architect Areas 1, 2)
 
-### Workstream 2: Ops Foundation (Area 4)
+| Step | What | Epic | Target |
+|------|------|------|--------|
+| 1a | Assign and unblock item validation | PLT-2651 | Owner assigned this sprint |
+| 1b | Implement item property validation | PLT-2651 | All item writes validated before Spanner persistence |
+| 1c | Assign and implement Item Patch APIs | PLT-2378 | `PATCH/DELETE /api/.../items` live on Cloud Run |
+| 1d | Assess SIC requirement | PLT-2274 | Determined during tenant selection (PLT-2601) |
+| 1e | Platform hardening: SLA/trackingId | PLT-171 | Priority timestamps on CQS events |
+| 1f | Platform hardening: LFS overwrite protection | PLT-2658 | GCS API usage aligned |
+| 1g | Feature delivery scoped to tenant profile | PLT-2360, 2361, 2350, 2356, 2363, 2352 | Feature subset activated per tenant assessment |
 
-These can run partially in parallel with Workstream 1 (especially load testing design and monitoring setup).
+**Demo:** Write an item via PATCH → item passes validation → `storeitemvalues` appears in Spanner → CQS fans out → evaluator + renderer process it → `eslimage` written.
 
-| Step | What | Why |
-|------|------|-----|
-| 2a | **PLT-171** — SLA/trackingId | Interactive ops (single price change) must beat bulk imports in CQS queues. Implement priority timestamps. |
-| 2b | **PLT-2579** — Monitoring | Dashboards for: CQS queue depth per service, Spanner latency, Cloud Run error rates, transmission success rates. Alert on pipeline stalls. |
-| 2c | **PLT-2576** — Load Testing | Prove the system handles the Phase 1 tenant's peak volume. For Landwaart: active produce retailer with frequent updates. For Spar-be: ~13K ESLs. |
-| 2d | **PLT-2599** — Cutover Runbook | Write, review, and rehearse the 7-step switch procedure from [doc 14](14-tenant-migration.md). Must include a tested rollback. |
+### M3 Inc 2: Security & Isolation (Architect Area 3)
 
-### Workstream 3: Tenant Onboarding (Area 6)
+| Step | What | Epic | Target |
+|------|------|------|--------|
+| 2a | Prove tenant isolation | PLT-2578 | Automated cross-tenant read tests pass; `t/{tenantId}` prefix enforced |
+| 2b | Write protection | PLT-170 | Auth0 JWT-based M2M write permissions per tenant |
 
-| Step | What | Why |
-|------|------|-----|
-| 3a | **PLT-2601** — Select first tenant | Drive the decision: scorecard with feature profile, ESL count, update patterns, integration complexity, business risk. |
-| 3b | **PLT-2572** — Store Onboarding | Build the repeatable process: register store in Spanner, create `storeesl` records, verify ESLs are reachable via transmission. |
-| 3c | **PLT-2575** — Store DTO Schema | Ensure `store` DTO is available to all cloud services. |
-| 3d | **PLT-2600** — Studio Readiness | The tenant's designs and scenarios must be production-hardened in `studio-design-library`, `studio-scenario-library`. |
+**Demo:** Provision two tenants. Write data for both. Attempt cross-tenant reads through every Cloud Run service. All rejected.
 
-### Workstream 4: Feature Delivery & Validation (Areas 2, 5)
+### M3 Inc 3: Tenant Switch (Architect Areas 5, 6)
 
-Before the switch, every Phase 1 tenant runs in Shadow Mode — the full cloud pipeline executes in parallel but doesn't touch real labels.
+| Step | What | Epic | Target |
+|------|------|------|--------|
+| 3a | Select first tenant | PLT-2601 | Decision within 2 weeks; scorecard based |
+| 3b | Store onboarding built | PLT-2572, 2575 | Repeatable store provisioning in Spanner |
+| 3c | Studio production readiness | PLT-2600 | Tenant designs hardened in studio services |
+| 3d | Integration tests passing | PLT-2430 | All Phase 1 APIs passing TA2 E2E suite |
+| 3e | Per-tenant Shadow Mode | — | Enable Shadow Mode for the Phase 1 tenant. 24+ hour image parity confirmed. Config → items → links pushed in dependency order. |
+| 3f | Execute 7-step switch — byPricer | — | Switch procedure from [doc 14](14-tenant-migration.md), rehearsed on Phase 0 tenant first |
 
-| Step | What | Success Criteria |
-|------|------|-----------------|
-| 4a | Enable Shadow Mode for the tenant | Config pushed first, then items, then links. Order enforced in the export pipe. |
-| 4b | 24+ hour image parity validation | 100% match between R3Server-rendered and DTOflow-rendered images for all ESLs. |
-| 4c | API call parity + integration tests (PLT-2430) | All Phase 1 APIs passing TA2 integration tests; identical responses from cloud and R3Server paths. |
+**Demo:** byPricer tenant live on DTOflow. Item updates flow through cloud path. R3Server is thin edge (transmission only).
 
-### Workstream 5: The Switch (Area 6)
+### M4 Inc 1: Monitoring (Architect Area 4)
 
-The 7-step procedure from [doc 14](14-tenant-migration.md), rehearsed first on a Phase 0 tenant:
+| Step | What | Epic | Target |
+|------|------|------|--------|
+| 1a | Production monitoring dashboards | PLT-2579 | CQS queue depth, Spanner latency, Cloud Run error rates, transmission success rates |
+| 1b | Status reporting API | PLT-2444 | Item update metrics API |
+
+**Demo:** Live dashboard showing pipeline health for the cut-over tenant.
+
+### M4 Inc 2: Load Test (Architect Area 5)
+
+| Step | What | Epic | Target |
+|------|------|------|--------|
+| 2a | Production-scale load testing | PLT-2576 | 2–3× peak tenant volume replayed; p99 latency parity confirmed |
+| 2b | Auto-scaling validated | PLT-2369 | CQS-driven scaling or Cloud Run built-in confirmed sufficient |
+
+**Demo:** Replay the tenant's historical update volume at 2× peak. All pipelines stay within latency thresholds.
+
+### M4 Inc 3: DR & Runbook (Architect Area 4)
+
+| Step | What | Epic | Target |
+|------|------|------|--------|
+| 3a | Cutover & rollback runbook | PLT-2599 | 7-step procedure written, reviewed, rehearsed on byPricer |
+| 3b | Disaster recovery | PLT-2580 | Spanner scheduled backups; documented restore procedure; DR drill passed |
+| 3c | Operational runbooks | PLT-2581 | Per-service runbooks for common failure scenarios |
+
+**Demo:** Execute the full switch + rollback on byPricer. Execute DR restore from backup. Both complete within recovery windows.
+
+### Post-Cutover: Hypercare
+
+After a tenant switches, a 2-week hypercare period applies before the next tenant:
 
 | Step | Action | Owner |
 |------|--------|-------|
-| 5a | **Block store at router** — all API calls interrupted, no calls reach store | Infrastructure |
-| 5b | **Pause CQS subscriptions** — prevent event processing during reconfiguration | Platform |
-| 5c | **Backup R3Server DB, reconfigure** — disable Shadow Mode, drop items table, drop link table | DBA / Platform |
-| 5d | **Shut down R3Server** (full stop) | Infrastructure |
-| 5e | **Switch router** — re-route item/link API paths to cloud, transmission path stays to R3Server | Infrastructure |
-| 5f | **Resume CQS subscriptions** | Platform |
-| 5g | **Restart R3Server as thin edge** — transmission only, no local DB | Infrastructure |
+| HC1 | Monitor CQS queue depth, transmission latency, image parity continuously | Platform |
+| HC2 | Be ready to execute the rollback procedure if needed | Infrastructure |
+| HC3 | Review all alerts and incidents before clearing the next tenant to switch | Engineering lead |
 
-**Post-cutover:** 2-week hypercare period. Monitor CQS queue depth, transmission latency, image parity. Be ready to execute the rollback procedure.
+---
+
+### How the old Workstreams map to M3/M4
+
+For readers familiar with the earlier 5-Workstream structure:
+
+| Old Workstream | New Home |
+|---------------|----------|
+| WS1: Close Phase 0 & Foundation | Phase 0 (M1/M2) prerequisites + M3 Inc 1 |
+| WS2: Ops Foundation | M4 Inc 1 + M4 Inc 3 |
+| WS3: Tenant Onboarding | M3 Inc 3 |
+| WS4: Feature Delivery & Validation | M3 Inc 1 + M3 Inc 3 |
+| WS5: The Switch | M3 Inc 3 |
 
 ---
 
@@ -678,4 +696,4 @@ These are the concrete steps a lead can take right now, ranked by impact:
 
 > **Source:** Phase 1 activity areas, acceptance criteria, and tenant sequence from the Replatforming architect's [Phase 1 Activity Planning](https://pricer-org.atlassian.net/wiki/x/LAD8XwI) Confluence page (PS space, page ID 10198908937).
 >
-> **Companion docs:** [03 — Replatforming Deep Dive](03-replatforming-deep-dive.md) · [04 — Target Architecture](04-target-architecture.md) · [13 — Core Data Flows](13-core-data-flows.md) · [14 — Tenant Migration](14-tenant-migration.md) · [15 — Overall Status](15-overall-status-v2.md) · [19 — Dimension Frameworks](19-dimension-frameworks.md)
+> **Companion docs:** [03 — Replatforming Deep Dive](03-replatforming-deep-dive.md) · [04 — Target Architecture](04-target-architecture.md) · [13 — Core Data Flows](13-core-data-flows.md) · [14 — Tenant Migration](14-tenant-migration.md) · [15 — Overall Status](15-overall-status.md) · [19 — Delivery Framework](19-dimension-frameworks.md)

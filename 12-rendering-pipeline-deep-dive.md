@@ -9,8 +9,10 @@
 The Rendering Pipeline converts **item data + design templates** into **label images** that are transmitted to ESL hardware. It is the visual output layer of the platform — what the customer actually sees on the shelf.
 
 ```mermaid
+---
 config:
     layout: elk
+---
 flowchart TB
     SIV[("storeitemvalues.v1")]
     LV2[("link.v2")]
@@ -402,8 +404,10 @@ message RenderedImage {
 The most common rendering flow. A price change triggers the full rendering pipeline. Both evaluator and renderer are triggered in parallel — there is no "shortcut" or "bypass."
 
 ```mermaid
+---
 config:
     layout: elk
+---
 sequenceDiagram
     participant Item as item-registry
     participant SLE as studio-link-evaluator
@@ -598,8 +602,10 @@ lfs://dtoflow-lfs/renderedimage/{tenantId}/{storeId}/{imageId}
 ## 7. Rendering Pipeline Dependencies
 
 ```mermaid
+---
 config:
     layout: elk
+---
 flowchart TB
     subgraph inputs["Inputs (all live)"]
         A["Design Templates<br/>studio-design-library ✅"]

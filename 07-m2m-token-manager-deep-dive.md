@@ -23,8 +23,10 @@ In Pricer it is implemented as the Spring `@Service` **`SharedStoreUnitEvoTokenS
 When a **human** calls CM, the user's EVO token is forwarded. When CM acts **on its own behalf** (background jobs, forwarding to Store-Units, calling external renderer / DMS), there is no user token — so it mints a service token.
 
 ```mermaid
+---
 config:
     layout: elk
+---
 flowchart TB
     subgraph Human["👤 Human flow"]
         H1["login → EVO JWT"] --> H2["BFF/CM forwards user token → R3Server"]
@@ -71,8 +73,10 @@ private int m2mTokenCacheExpiryInSeconds = 60 * 60 * 7;                      // 
 
 ### 3.3 Token fetch flow ✅
 ```mermaid
+---
 config:
     layout: elk
+---
 sequenceDiagram
     participant CM as Central-Manager
     participant Cache as Guava LoadingCache
@@ -165,8 +169,10 @@ Environment is wired in `central-manager-deployment.yaml` (Spring relaxed-bindin
 | Usage | BFF/CM forwards user token → R3Server | CM → external renderer / DMS / Store-Units |
 
 ```mermaid
+---
 config:
     layout: elk
+---
 flowchart LR
     subgraph U["👤 EVO user token"]
         U1["login → JWT (sub/tenant/role/tags)"]
