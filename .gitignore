@@ -1,4 +1,4 @@
-_sources/
+docs/_sources/
 site/
 __pycache__/
 *.pyc

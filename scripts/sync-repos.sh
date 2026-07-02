@@ -3,7 +3,7 @@
 # Run from the hub repo root.
 set -euo pipefail
 
-SOURCES_DIR="_sources"
+SOURCES_DIR="docs/_sources"
 REPO_LIST_FILE="repos.txt"
 GITHUB_ORG="PricerAB"
 

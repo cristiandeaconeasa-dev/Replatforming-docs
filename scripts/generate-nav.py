@@ -12,7 +12,7 @@ from typing import Optional
 import yaml
 from pathlib import Path
 
-SOURCES_DIR = "_sources"
+SOURCES_DIR = "docs/_sources"
 MKDOCS_YML = "mkdocs.yml"
 NAV_MARKER = "# REST OF NAV IS AUTO-GENERATED FROM _sources/"
 
