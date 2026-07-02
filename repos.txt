@@ -1,6 +1,0 @@
-# Pricer Documentation Sources
-# One repo per line. Lines starting with # are ignored.
-# The sync script clones each repo into _sources/<name>/.
-
-# Platform Core
-PricerAB/evo-dtoflow-protos
