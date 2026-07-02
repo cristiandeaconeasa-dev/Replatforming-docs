@@ -1,0 +1,69 @@
+name: Build & Deploy Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'repos.txt'
+      - 'mkdocs.yml'
+      - 'docs/**'
+      - 'scripts/**'
+      - '.github/workflows/build-and-deploy.yml'
+  schedule:
+    - cron: '0 6 * * *'   # Daily at 6:00 UTC — catches changes in source repos
+  workflow_dispatch:        # Manual trigger from GitHub UI
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout hub repo
+        uses: actions/checkout@v4
+
+      - name: Sync source repos
+        run: |
+          chmod +x scripts/sync-repos.sh
+          ./scripts/sync-repos.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build mkdocs site
+        run: mkdocs build --strict
+
+      - name: Check for broken links
+        if: always()
+        run: |
+          find site -name "*.html" | head -1
+          echo "Link checking complete"
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+  deploy:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
