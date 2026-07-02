@@ -16,6 +16,9 @@ fi
 
 echo "=== Syncing doc-source repos ==="
 
+# Ensure sources directory exists
+mkdir -p "${SOURCES_DIR}"
+
 # Clean previous sources but preserve .gitkeep
 rm -rf "${SOURCES_DIR:?}"/*
 touch "${SOURCES_DIR}/.gitkeep"
