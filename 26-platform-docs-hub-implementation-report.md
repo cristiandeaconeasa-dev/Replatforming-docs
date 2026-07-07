@@ -416,3 +416,108 @@ Both URLs serve byte-identical content (verified via matching `etag` and `last-m
 ---
 
 *Report generated July 2, 2026 from live system state. Last reconciled with GCP on 2026-07-07 — service config and revision count verified via `gcloud run services describe` and `gcloud run revisions list` against project `platform-dev-p01`.*
+
+---
+
+## Changes Applied 2026-07-07 — Alignment Pass
+
+A second-pass reconciliation was done on 2026-07-07 after discovering that several claims in this report (and in docs 18 and 27) had drifted from actual GCP reality. The work was driven by the principle: **GCP is the single source of truth, not the drafts.**
+
+### What was wrong
+
+| Source | Drift from reality |
+|:---|:---|
+| This report | Claimed "4 commits" / "7 CI runs" — actual is **14 revisions, 0 Cloud Run CI runs** |
+| This report + doc 27 | Deploy commands had stale `--min-instances` / `--max-instances` flags and no `--timeout` |
+| This report + doc 27 | Single URL assumed; legacy URL was unmentioned |
+| Doc 18 §10 | Changelog table was missing GCP-discovered deltas (dual URLs, exact deploy flags, default SA, in-Docker sync step, teal palette, etc.) |
+| `repos.txt` + `sync-repos.sh` | Convention for `owner/repo` form was implicit; bare repo names would silently produce broken URLs |
+
+### Fixes applied
+
+#### Fix 1 — `repos.txt` clarity and guardrail
+
+**Where:** `platform-docs-hub-pricer/repos.txt`, `platform-docs-hub-pricer/scripts/sync-repos.sh`
+**Committed:** `c930a01 — fix: enforce owner/repo convention in repos.txt`
+
+- Added a header comment to `repos.txt` explaining the `owner/repo` convention and why it's used.
+- Added a runtime check in `sync-repos.sh` that rejects bare repo names with a clear error message instead of silently producing broken URLs.
+- **Validated:** `bash sync-repos.sh` clones both repos correctly; a test with bare name `evo-dtoflow-protos` was rejected with `must be in 'owner/repo' form (e.g. PricerAB/evo-dtoflow-protos)`.
+- **No regression:** `mkdocs build --strict` produces 99 pages; valid routes return 200; unknown paths return 404.
+
+#### Fix 2 — Legacy URL documented precisely
+
+**Where:** Doc 26 (this report), doc 18 §10
+**Committed:** `1e55893 — docs: align platform-docs-hub docs with GCP reality`
+
+- Verified via `curl -I` that both URLs serve byte-identical content (matching `etag: "6a467c1b-dfd2"` and `last-modified: Thu, 02 Jul 2026 14:56:27 GMT`).
+- Identified the legacy URL as a Cloud Run **default domain mapping** from the previous project `yrwyrs6axa`; cannot be removed through the public gcloud API.
+- All docs (26, 27) now use only the canonical URL `https://platform-docs-hub-990006507229.europe-north1.run.app` in commands and examples.
+- Added explicit action items: use canonical URL everywhere, open Google Cloud support case for removal, optionally set up 301 redirect via HTTPS LB.
+
+#### Fix 3 — `--max-instances=3` explicit in deploy commands
+
+**Where:** Doc 26 deploy command, doc 27 (3 commands total), live Cloud Run service
+**Committed:** `1e55893 — docs: align platform-docs-hub docs with GCP reality` (docs); separate `gcloud run services update` for live service
+**Live revision:** `platform-docs-hub-00015-4kx`
+
+- Added `--max-instances=3` to all three deploy commands in doc 26 and doc 27 (full deploy, quick-ref, one-liner).
+- Behavior unchanged — was previously enforced via revision template annotation `autoscaling.knative.dev/maxScale: '3'`.
+- Applied to live service via `gcloud run services update platform-docs-hub --max-instances=3` — revision `00015-4kx` is now deployed with the flag set explicitly. Verified live: both URLs return 200.
+
+### Additional cleanups in this pass
+
+- Doc 18 §10 changelog expanded from 14 to 21 rows including the GCP-discovered deltas.
+- Doc 18 §10.3 open-work updated with three new items (legacy URL, deploy flag visibility done, repos.txt fix done).
+- Doc 26 deployment table now sourced from `gcloud run services describe` with a Source column.
+- Doc 26 architecture diagram updated to show sync running inside Docker build, not as a separate pre-step.
+- Doc 26 sequence diagram shows the actual local-build flow (developer → docker → push → gcloud deploy).
+- Doc 26 metrics table no longer claims "7 CI runs" / "4 commits" — reality is 0 Cloud Run CI runs and 14 revisions.
+
+### Verification trail
+
+```bash
+# Confirm live state after all fixes
+$ gcloud run services describe platform-docs-hub --region=europe-north1 --project=platform-dev-p01 \
+    --format='value(status.latestReadyRevisionName)'
+platform-docs-hub-00015-4kx
+
+$ gcloud run services describe platform-docs-hub --region=europe-north1 --project=platform-dev-p01 \
+    --format='value(status.observedGeneration)'
+15
+
+$ curl -sI https://platform-docs-hub-990006507229.europe-north1.run.app/ | head -1
+HTTP/2 200
+
+$ curl -sI https://platform-docs-hub-yrwyrs6axa-lz.a.run.app/ | head -1
+HTTP/2 200
+
+# Confirm doc and code changes are committed
+$ git -C /Users/cridea/Projects/AI/platform-docs-hub-pricer log --oneline -2
+c930a01 fix: enforce owner/repo convention in repos.txt
+31fbf8a feat: add Impeccable-inspired custom theme — restrained professional
+
+$ git -C /Users/cridea/Projects/AI/Replatforming/onboarding log --oneline -2
+1e55893 docs: align platform-docs-hub docs with GCP reality + Fix #2 + Fix #3
+c41439f Latest docs update.
+```
+
+### Open items remaining (post-fix)
+
+The fixes did not address the deeper open items in [Remaining Work](#remaining-work) — they remain:
+
+| Priority | Item | Status |
+|:---:|:---|:---|
+| High | CI pipeline for Cloud Run (not Pages) | Untouched |
+| High | Stop using `--allow-unauthenticated` before sensitive content lands | Untouched |
+| Medium | Adopt the 15 backlog repos | Untouched |
+| Medium | Custom domain `docs.pricer-plaza.com` | Untouched |
+| Medium | Open Google Cloud support case to remove legacy URL default mapping | **Not done — documented, awaiting action** |
+| Low | Auto-discovery of repos with `docs/` | Untouched |
+| Low | Fix nav title formatting | Untouched |
+| Low | Versioned docs (`mike` plugin) | Untouched |
+| Low | Stale content detection workflow | Untouched |
+
+---
+
+*Alignment pass completed 2026-07-07 by reconciliation against `gcloud run services describe`, `gcloud run revisions list`, and `curl` against both service URLs. All three fixes verified at runtime.*
