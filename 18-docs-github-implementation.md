@@ -5,19 +5,25 @@
 > **Audience:** Platform engineer implementing the docs platform. Every command is copy-paste ready. Every YAML file is complete.
 >
 > **Drafted:** 2026-06-30 — validated against Pricer's existing GCP infrastructure (`platform-dev-p01`, `europe-north1`, Cloud Run, IAP) and the `evo-dtoflow-protos` docs model.
+>
+> **Last updated:** 2026-07-07 — reconciled with what was actually built. See [§10 Changelog vs. plan](#10-changelog-vs-plan) for the full delta. Companion docs: [26 — Implementation Report](26-platform-docs-hub-implementation-report.md) (build history, 8 issues hit and fixed) and [27 — Operations Guide](27-hub-operations-guide.md) (day-to-day procedures, caching gotchas).
+
+> **⚠️ Status of this guide.** This document still describes the *target* design for the docs hub. Some sections (IAP, custom domain, full CI/CD with Workload Identity Federation, stale-content detection) are not yet implemented — see [§10](#10-changelog-vs-plan) for what is live vs. deferred. The live hub runs at `https://platform-docs-hub-990006507229.europe-north1.run.app` and currently serves 93 pages from 2 source repos.
 
 ---
 
 ## Table of Contents
 
 1. [Infrastructure Setup](#1-infrastructure-setup) — GCP project, Cloud Run, IAP, DNS
-2. [Hub Repo: `evo-docs`](#2-hub-repo-evo-docs) — Complete file-by-file setup
+2. [Hub Repo: `platform-docs-hub`](#2-hub-repo-platform-docs-hub) — Complete file-by-file setup
 3. [Creating a New Repo with Docs](#3-creating-a-new-repo-with-docs) — Template + conventions
 4. [Adopting an Existing Repo](#4-adopting-an-existing-repo) — Step-by-step guide
 5. [Adding & Removing Docs from the Hub](#5-adding--removing-docs-from-the-hub)
 6. [CI/CD Pipeline Details](#6-cicd-pipeline-details)
 7. [Maintenance Procedures](#7-maintenance-procedures)
 8. [Troubleshooting](#8-troubleshooting)
+9. [Contribution Workflows](#9-contribution-workflows)
+10. [Changelog vs. plan](#10-changelog-vs-plan) — what was actually built vs. drafted here
 
 ---
 
@@ -27,8 +33,9 @@
 
 - GCP project with billing enabled (`platform-dev-p01` recommended — same as the rest of the platform)
 - `gcloud` CLI authenticated
-- GitHub repo `PricerAB/evo-docs` (already exists, currently empty)
+- GitHub repo `PricerAB/platform-docs-hub` (created 2026-07-02, was originally drafted here as `evo-docs`)
 - Docker installed locally (for testing the Dockerfile)
+- `gh` CLI authenticated (for sourcing the GitHub token used at build time to clone source repos)
 
 ### 1.2 Enable Required GCP APIs
 
@@ -36,41 +43,45 @@
 gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
-  iap.googleapis.com \
-  cloudbuild.googleapis.com \
   --project=platform-dev-p01
 ```
+
+> **Note:** `iap.googleapis.com` and `cloudbuild.googleapis.com` are not yet enabled — the hub currently runs public on Cloud Run (see [§10](#10-changelog-vs-plan)). IAP and Cloud Build will be re-added when we wire up the production CI/CD pipeline and the `docs.pricer-plaza.com` custom domain.
 
 ### 1.3 Create Artifact Registry Repository
 
 ```bash
-gcloud artifacts repositories create evo-docs \
+gcloud artifacts repositories create evo-images \
   --repository-format=docker \
-  --location=europe-north1 \
+  --location=europe-west3 \
   --project=platform-dev-p01
 ```
 
+> **Note:** The registry lives in `europe-west3-docker.pkg.dev` (not `europe-north1-docker`). This was a deliberate choice — Artifact Registry already had an existing `evo-images` repo we reuse for the docs hub image, avoiding creating a new registry just for docs. Cloud Run deploys from `europe-west3` even though the service itself runs in `europe-north1`.
+
 ### 1.4 Set Up Workload Identity Federation (for GitHub Actions → GCP)
+
+> **Status: NOT YET IMPLEMENTED.** The current deployment is manual (local `docker build` + `docker push` + `gcloud run deploy`), see [§10](#10-changelog-vs-plan). This section is the *target* design that will be wired up in the next iteration. Skip it for now.
 
 This lets GitHub Actions deploy to Cloud Run without storing long-lived service account keys.
 
 ```bash
 # Create a service account for the CI pipeline
-gcloud iam service-accounts create evo-docs-ci \
-  --display-name="evo-docs CI/CD" \
+gcloud iam service-accounts create platform-docs-hub-ci \
+  --display-name="platform-docs-hub CI/CD" \
   --project=platform-dev-p01
 
 # Grant required roles
 gcloud projects add-iam-policy-binding platform-dev-p01 \
-  --member="serviceAccount:evo-docs-ci@platform-dev-p01.iam.gserviceaccount.com" \
+  --member="serviceAccount:platform-docs-hub-ci@platform-dev-p01.iam.gserviceaccount.com" \
   --role="roles/run.admin"
 
 gcloud projects add-iam-policy-binding platform-dev-p01 \
-  --member="serviceAccount:evo-docs-ci@platform-dev-p01.iam.gserviceaccount.com" \
+  --member="serviceAccount:platform-docs-hub-ci@platform-dev-p01.iam.gserviceaccount.com" \
   --role="roles/artifactregistry.writer"
 
 gcloud projects add-iam-policy-binding platform-dev-p01 \
-  --member="serviceAccount:evo-docs-ci@platform-dev-p01.iam.gserviceaccount.com" \
+  --member="serviceAccount:platform-docs-hub-ci@platform-dev-p01.iam.gserviceaccount.com" \
   --role="roles/iam.serviceAccountUser"
 
 # Create Workload Identity Pool
@@ -85,25 +96,25 @@ POOL_ID=$(gcloud iam workload-identity-pools describe "github-pool" \
   --location="global" \
   --format="value(name)")
 
-# Create a provider for the evo-docs repo
-gcloud iam workload-identity-pools providers create-oidc "evo-docs-provider" \
+# Create a provider for the platform-docs-hub repo
+gcloud iam workload-identity-pools providers create-oidc "platform-docs-hub-provider" \
   --project="platform-dev-p01" \
   --location="global" \
   --workload-identity-pool="github-pool" \
-  --display-name="evo-docs GitHub Actions" \
+  --display-name="platform-docs-hub GitHub Actions" \
   --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
   --issuer-uri="https://token.actions.githubusercontent.com"
 
-# Allow the evo-docs repo to impersonate the service account
+# Allow the platform-docs-hub repo to impersonate the service account
 gcloud iam service-accounts add-iam-policy-binding \
-  "evo-docs-ci@platform-dev-p01.iam.gserviceaccount.com" \
+  "platform-docs-hub-ci@platform-dev-p01.iam.gserviceaccount.com" \
   --project="platform-dev-p01" \
   --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/${POOL_ID}/attribute.repository/PricerAB/evo-docs"
+  --member="principalSet://iam.googleapis.com/${POOL_ID}/attribute.repository/PricerAB/platform-docs-hub"
 ```
 
 **Note the WIF provider name** — you'll add it as `WIF_PROVIDER` secret in GitHub. It looks like:
-`projects/123456789/locations/global/workloadIdentityPools/github-pool/providers/evo-docs-provider`
+`projects/123456789/locations/global/workloadIdentityPools/github-pool/providers/platform-docs-hub-provider`
 
 ### 1.5 Deploy Cloud Run Service (Initial Empty Deploy)
 
@@ -111,28 +122,37 @@ First, we need an initial deploy so IAP can be configured. Use a placeholder con
 
 ```bash
 # Create a minimal placeholder
-mkdir -p /tmp/evo-docs-placeholder
-cat > /tmp/evo-docs-placeholder/Dockerfile << 'EOF'
+mkdir -p /tmp/platform-docs-hub-placeholder
+cat > /tmp/platform-docs-hub-placeholder/Dockerfile << 'EOF'
 FROM nginx:alpine
 RUN echo '<html><body><h1>Pricer Docs — Coming Soon</h1></body></html>' \
   > /usr/share/nginx/html/index.html
 EOF
 
 # Build and push
-gcloud builds submit /tmp/evo-docs-placeholder \
-  --tag=europe-north1-docker.pkg.dev/platform-dev-p01/evo-docs/placeholder \
+gcloud builds submit /tmp/platform-docs-hub-placeholder \
+  --tag=europe-west3-docker.pkg.dev/platform-dev-p01/evo-images/platform-docs-hub \
   --project=platform-dev-p01
 
 # Deploy
-gcloud run deploy evo-docs \
-  --image=europe-north1-docker.pkg.dev/platform-dev-p01/evo-docs/placeholder \
+gcloud run deploy platform-docs-hub \
+  --image=europe-west3-docker.pkg.dev/platform-dev-p01/evo-images/platform-docs-hub \
   --region=europe-north1 \
   --platform=managed \
   --allow-unauthenticated \
+  --memory=256Mi \
+  --cpu=1 \
+  --min-instances=0 \
+  --max-instances=3 \
+  --concurrency=80 \
   --project=platform-dev-p01
 ```
 
+> **Live command actually used.** The deploy flag set above (`--memory=256Mi`, `--cpu=1`, `--min-instances=0`, `--max-instances=3`, `--concurrency=80`) is the current production configuration. See [27 — Operations Guide §1](27-hub-operations-guide.md) for the copy-paste-ready full deploy command.
+
 ### 1.6 Configure IAP (Identity-Aware Proxy)
+
+> **Status: NOT YET IMPLEMENTED.** The hub is currently **public** (`--allow-unauthenticated`) — see [§10](#10-changelog-vs-plan). IAP will be re-enabled when we set up the `docs.pricer-plaza.com` custom domain via load balancer. The PricerAB org also disabled GitHub Pages org-wide, which made the originally drafted Pages-based auth approach unworkable.
 
 IAP for Cloud Run requires a **Serverless NEG + external load balancer**. The `gcloud iap web` commands target App Engine/Compute Engine, not Cloud Run directly. Here's the correct approach:
 
@@ -143,7 +163,7 @@ IAP for Cloud Run requires a **Serverless NEG + external load balancer**. The `g
 **Step 2: Remove unauthenticated access from Cloud Run:**
 
 ```bash
-gcloud run services update evo-docs \
+gcloud run services update platform-docs-hub \
   --region=europe-north1 \
   --project=platform-dev-p01 \
   --no-allow-unauthenticated
@@ -156,16 +176,16 @@ gcloud run services update evo-docs \
 PROJECT_NUMBER=$(gcloud projects describe platform-dev-p01 --format='value(projectNumber)')
 
 # Grant the IAP service agent invoker permission
-gcloud run services add-iam-policy-binding evo-docs \
+gcloud run services add-iam-policy-binding platform-docs-hub \
   --region=europe-north1 \
   --project=platform-dev-p01 \
   --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-iap.iam.gserviceaccount.com" \
   --role="roles/run.invoker"
 ```
 
-**Step 4: Set up Serverless NEG + Load Balancer with IAP** (when ready for `docs.pricer.com` — see §1.7):
+**Step 4: Set up Serverless NEG + Load Balancer with IAP** (when ready for `docs.pricer-plaza.com` — see §1.7):
 
-For the initial setup, use the Cloud Console: **Cloud Run → evo-docs → Security → "Use Identity-Aware Proxy"** and enable it. Then add the `IAP-secured Web App User` role to `domain:pricer.com`.
+For the initial setup, use the Cloud Console: **Cloud Run → platform-docs-hub → Security → "Use Identity-Aware Proxy"** and enable it. Then add the `IAP-secured Web App User` role to `domain:pricer.com`.
 
 For programmatic setup via gcloud (after the load balancer is created):
 
@@ -184,9 +204,9 @@ gcloud iap web add-iam-policy-binding \
   --project=platform-dev-p01
 ```
 
-> **Phase 1 simplification:** Use the Cloud Console for IAP setup. The Serverless NEG + load balancer approach is documented in §1.7 (DNS). Until then, the auto-generated `*.a.run.app` URL with `--no-allow-unauthenticated` provides IAP protection without the load balancer.
+> **Phase 1 simplification:** The hub currently runs publicly on Cloud Run with no IAP. The internal-only access model is deferred until the custom domain lands. Internal documentation that must stay private lives in Confluence — the docs hub is for content that's safe to share externally.
 
-### 1.7 DNS Configuration (when ready for `docs.pricer.com`)
+### 1.7 DNS Configuration (when ready for `docs.pricer-plaza.com`)
 
 ```bash
 # Create a global external load balancer with IAP
@@ -195,34 +215,36 @@ gcloud compute addresses create docs-pricer-ip --global
 
 # 2. Create a managed SSL certificate
 gcloud compute ssl-certificates create docs-pricer-cert \
-  --domains=docs.pricer.com --global
+  --domains=docs.pricer-plaza.com --global
 
 # 3. Map the IP to Cloud Run via Serverless NEG
 gcloud compute network-endpoint-groups create docs-pricer-neg \
   --region=europe-north1 \
   --network-endpoint-type=serverless \
-  --cloud-run-service=evo-docs
+  --cloud-run-service=platform-docs-hub
 
 # 4. Create backend service, URL map, target proxy, forwarding rule
 # (Full load balancer setup is ~6 more commands — see GCP docs:
 #  https://cloud.google.com/load-balancing/docs/https/setting-up-https-serverless)
 
 # 5. Add CNAME record in Pricer's DNS:
-#    docs.pricer.com → <static-ip-from-step-1>
+#    docs.pricer-plaza.com → <static-ip-from-step-1>
 ```
 
-> **For Phase 1, skip DNS** — use the auto-generated Cloud Run URL (`evo-docs-xxxxx-oc.a.run.app`). DNS + load balancer can wait until the site has content worth sharing.
+> **For Phase 1, skip DNS** — use the auto-generated Cloud Run URL (`https://platform-docs-hub-990006507229.europe-north1.run.app`). DNS + load balancer can wait until the site has content worth sharing.
 
 ---
 
-## 2. Hub Repo: `evo-docs`
+## 2. Hub Repo: `platform-docs-hub`
 
 This is the complete file-by-file setup for the central documentation hub.
+
+> **Live repo:** `PricerAB/platform-docs-hub` (was originally drafted here as `evo-docs` — renamed when we discovered the org already used `evo-docs` semantically elsewhere). Local working copy: `/Users/cridea/Projects/AI/platform-docs-hub-pricer`.
 
 ### 2.1 Repository Structure
 
 ```
-evo-docs/
+platform-docs-hub/
 ├── mkdocs.yml
 ├── Dockerfile
 ├── nginx.conf
@@ -234,17 +256,20 @@ evo-docs/
 │   └── generate-nav.py        # Auto-generates mkdocs nav from cloned repos
 ├── .github/
 │   └── workflows/
-│       └── build-and-deploy.yml
+│       └── build-and-deploy.yml    # ⚠️ Currently broken — still targets Pages
+├── repos.txt                  # Source repo registry
 ├── .gitignore
 └── README.md
 ```
+
+> **Important naming note.** Source repos are cloned into `docs/sources/<repo>/` (NOT `docs/_sources/`). Underscore-prefixed directories are silently 404'd by nginx and most CDNs — see [26 §Attempt 5](26-platform-docs-hub-implementation-report.md) for the full debugging trail.
 
 ### 2.2 `mkdocs.yml`
 
 ```yaml
 site_name: "Pricer Documentation"
 site_description: "Pricer AB platform documentation — architecture, services, APIs, and onboarding"
-repo_url: https://github.com/PricerAB/evo-docs
+repo_url: https://github.com/PricerAB/platform-docs-hub
 edit_uri: ""  # Disable edit links (content comes from other repos)
 
 theme:
@@ -302,8 +327,10 @@ markdown_extensions:
 # Keep a minimal static nav for the landing page:
 nav:
   - Home: docs/index.md
-  # REST OF NAV IS AUTO-GENERATED FROM _sources/
+  # REST OF NAV IS AUTO-GENERATED FROM sources/
 ```
+
+> **Note:** The marker comment in the live file says `FROM sources/` (not `FROM _sources/`). If you change the marker, update `NAV_MARKER` in `scripts/generate-nav.py` to match — the script fails with "Nav marker not found" if they drift.
 
 ### 2.3 `docs/index.md` (Landing Page)
 
@@ -376,15 +403,17 @@ pyyaml>=6.0
 
 ### 2.5 `scripts/sync-repos.sh`
 
-This script clones all doc-source repos into `_sources/`. It's the core of the aggregation approach.
+This script clones all doc-source repos into `sources/` (NOT `_sources/` — underscore-prefixed dirs are blocked by nginx). It's the core of the aggregation approach.
+
+> **Why `sources/` not `_sources/`:** MkDocs is happy to read from either, but the **served HTML** is what matters. nginx treats `_`-prefixed directories as hidden/internal and returns 404 even though the files are on disk. See [26 §Attempt 5](26-platform-docs-hub-implementation-report.md) — this is the single highest-impact gotcha in the whole pipeline.
 
 ```bash
 #!/bin/bash
-# sync-repos.sh — Clone all doc-source repos into _sources/
-# Run from the evo-docs repo root.
+# sync-repos.sh — Clone all doc-source repos into sources/
+# Run from the platform-docs-hub repo root.
 set -euo pipefail
 
-SOURCES_DIR="_sources"
+SOURCES_DIR="sources"
 REPO_LIST_FILE="repos.txt"
 GITHUB_ORG="PricerAB"
 
@@ -443,9 +472,9 @@ Auto-generates the `nav:` section of `mkdocs.yml` from cloned repos.
 
 ```python
 #!/usr/bin/env python3
-"""generate-nav.py — Scan _sources/ for docs and generate mkdocs nav structure.
+"""generate-nav.py — Scan sources/ for docs and generate mkdocs nav structure.
 
-For each cloned repo in _sources/:
+For each cloned repo in sources/:
 1. If the repo has docs/mkdocs.yml, extract its nav structure.
 2. Otherwise, scan docs/ for .md files and create a flat nav.
 3. Merge all navs into the hub's mkdocs.yml.
@@ -455,9 +484,9 @@ import os
 import yaml
 from pathlib import Path
 
-SOURCES_DIR = "_sources"
+SOURCES_DIR = "sources"
 MKDOCS_YML = "mkdocs.yml"
-NAV_MARKER = "# REST OF NAV IS AUTO-GENERATED FROM _sources/"
+NAV_MARKER = "# REST OF NAV IS AUTO-GENERATED FROM sources/"
 
 # Category mapping — which top-level section each repo belongs to
 # Add repos to the appropriate category as they're onboarded.
@@ -467,7 +496,7 @@ CATEGORY_MAP = {
         "section": "Platform Architecture",
         "label": "DTOflow & DTOs",
     },
-    "evo-docs": {"section": None},  # hub repo itself — skip
+    "platform-docs-hub": {"section": None},  # hub repo itself — skip
 
     # Services
     "platform-item-registry-api": {
@@ -564,7 +593,7 @@ def scan_repo_docs(repo_name: str, repo_path: Path) -> list[dict] | None:
     nav = []
     for f in md_files:
         rel = f.relative_to(docs_path)
-        src_path = f"_sources/{repo_name}/docs/{rel}"
+        src_path = f"sources/{repo_name}/docs/{rel}"
         title = f.stem.replace("-", " ").replace("_", " ").title()
         if rel == Path("index.md"):
             nav.insert(0, {title: src_path})
@@ -574,19 +603,26 @@ def scan_repo_docs(repo_name: str, repo_path: Path) -> list[dict] | None:
 
 
 def rewrite_paths(repo_name: str, nav: list) -> list:
-    """Rewrite paths in a nav structure to point to _sources/."""
+    """Rewrite paths in a nav structure to point to sources/.
+
+    Per-repo mkdocs.yml nav entries are written relative to that repo's
+    docs_dir. When we hoist them into the hub, we must:
+      1. Prepend `sources/<repo>/` (the clone location in the hub).
+      2. Prepend `docs/` if the per-repo entry doesn't already include it
+         (e.g., when the entry is `00-foo.md` rather than `docs/00-foo.md`).
+    """
     result = []
     for item in nav:
         if isinstance(item, dict):
             for key, value in item.items():
                 if isinstance(value, str):
-                    if not value.startswith("http") and not value.startswith("_"):
+                    if not value.startswith("http") and not value.startswith("sources/"):
                         # If path references a file outside docs/ (e.g., ../README.md),
                         # rewrite relative to the repo root, not docs/
                         if value.startswith("../") or not value.startswith("docs/"):
-                            value = f"_sources/{repo_name}/{value.lstrip('./')}"
+                            value = f"sources/{repo_name}/{value.lstrip('./')}"
                         else:
-                            value = f"_sources/{repo_name}/{value}"
+                            value = f"sources/{repo_name}/{value}"
                         # Remove double slashes if any
                         value = value.replace("//", "/")
                     result.append({key: value})
@@ -604,7 +640,7 @@ def rewrite_paths(repo_name: str, nav: list) -> list:
 def main():
     sources = Path(SOURCES_DIR)
     if not sources.is_dir():
-        print("No _sources/ directory — skipping nav generation")
+        print("No sources/ directory — skipping nav generation")
         return
 
     # Group nav entries by section
@@ -667,55 +703,75 @@ if __name__ == "__main__":
     main()
 ```
 
+> **Two non-obvious fixes baked into the live script (vs. the originally drafted version):**
+>
+> 1. **`SOURCES_DIR = "sources"`** — not `_sources`. See comment at the top of `sync-repos.sh` for why.
+> 2. **`rewrite_paths()` prepends `docs/`** when the per-repo nav entry doesn't already start with `docs/`. Without this, `replatforming-onboarding` (whose per-repo `mkdocs.yml` uses entries like `00-replatforming-program-overview.md`) renders 404s because the path becomes `sources/replatforming-onboarding/00-...md` instead of `sources/replatforming-onboarding/docs/00-...md`. See [26 §Attempt 6](26-platform-docs-hub-implementation-report.md) for the full debugging trail.
+
 ### 2.7 `repos.txt` (Doc-Source Registry)
 
 One repo per line. This is the canonical list of repos that contribute docs. Add/remove repos here to control what appears on the site.
 
+> **Status as of 2026-07-07.** Only the 2 repos below are *live* on the hub (93 pages total). The remaining 15 entries are the *target adoption backlog* — repos that need `docs/` folders and a per-repo `mkdocs.yml` before they can be uncommented. See [§10](#10-changelog-vs-plan) for the rollout plan.
+
 ```
 # Pricer Documentation Sources
 # One repo per line. Lines starting with # are ignored.
-# The sync script clones each repo into _sources/<name>/.
+# The sync script clones each repo into sources/<name>/.
 
-# Platform Core
+# === LIVE (2 repos, 93 pages) ===
 evo-dtoflow-protos
-
-# Cloud Run Services
-platform-item-registry-api
-platform-link-service
-platform-evaluation-engine
-platform-image-render-service
-platform-ecc-link-projector
-platform-migration-helper
-platform-scenario-service
-platform-dtoflow-server-spanner
-platform-customer-data
-
-# Replatforming
 replatforming-onboarding
 
+# === ADOPTION BACKLOG (uncomment after adding docs/ + mkdocs.yml) ===
+
+# Platform Core
+# evo-dtoflow-protos   ← already live above
+
+# Cloud Run Services
+# platform-item-registry-api
+# platform-link-service
+# platform-evaluation-engine
+# platform-image-render-service
+# platform-ecc-link-projector
+# platform-migration-helper
+# platform-scenario-service
+# platform-dtoflow-server-spanner
+# platform-customer-data
+
 # Consumer Apps
-chain-management-centralization
-plaza-mobile-ui-backend
-plaza-mobile-ui-frontend
+# chain-management-centralization
+# plaza-mobile-ui-backend
+# plaza-mobile-ui-frontend
 
 # Infrastructure
-cloud-infra-terragrunt-terraform
-platform-gcp-resources
+# cloud-infra-terragrunt-terraform
+# platform-gcp-resources
 ```
+
+To add a repo: create `docs/` and `mkdocs.yml` in the source repo (see [§3](#3-creating-a-new-repo-with-docs) or [§4](#4-adopting-an-existing-repo)), uncomment the line, and add a category entry in `scripts/generate-nav.py` → `CATEGORY_MAP`.
 
 ### 2.8 `Dockerfile`
 
-> **Important:** The Dockerfile expects `_sources/` to already exist (populated by `scripts/sync-repos.sh`) before `docker build`. In CI, `sync-repos.sh` runs before `docker build`. For local Docker builds, run `sync-repos.sh` first.
+> **Important:** The Dockerfile expects `sources/` to already exist (populated by `scripts/sync-repos.sh`) before `docker build`. In CI, `sync-repos.sh` runs before `docker build`. For local Docker builds, run `sync-repos.sh` first.
+
+> **Two gotchas baked into the live file (vs. the originally drafted version):**
+>
+> 1. **`apk add --no-cache bash`** — `sync-repos.sh` uses `#!/bin/bash` and bashisms (`[[ ... ]]`). Alpine's base image ships only `ash`, so the script fails with "not found" without this. See [26 §Attempt 3](26-platform-docs-hub-implementation-report.md).
+> 2. **`--platform linux/amd64` at build time** — Docker on Apple Silicon builds ARM images by default; Cloud Run requires amd64 and refuses the manifest with HTTP 422 otherwise. See [26 §Attempt 4](26-platform-docs-hub-implementation-report.md). This is *not* a Dockerfile change — it's a `docker build --platform linux/amd64` flag from the host CLI.
 
 ```dockerfile
 # Stage 1: Build the mkdocs site
 FROM python:3.12-alpine AS builder
 
+# bash is required for scripts/sync-repos.sh (bashisms like [[ ]])
+RUN apk add --no-cache bash git
+
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# _sources/ must exist (from sync-repos.sh run before docker build)
+# sources/ must exist (from sync-repos.sh run before docker build)
 COPY . .
 RUN mkdocs build --strict
 
@@ -784,6 +840,8 @@ http {
 
 ### 2.10 `.github/workflows/build-and-deploy.yml`
 
+> **⚠️ Status: NOT YET WIRED UP TO CLOUD RUN.** The current file in the hub still deploys to **GitHub Pages**, which is broken because PricerAB org disables Pages creation org-wide (HTTP 422 on `gh api ... pages -X POST`). See [26 §Attempts 1-2](26-platform-docs-hub-implementation-report.md). Until the workflow is updated for Cloud Run + WIF, deploys are done manually via the local one-liner in [27 §7](27-hub-operations-guide.md#7-build-command-one-liner-copy-paste-ready). The draft below is the *target* design.
+
 ```yaml
 name: Build & Deploy Docs
 
@@ -803,7 +861,7 @@ on:
 env:
   PROJECT_ID: platform-dev-p01
   REGION: europe-north1
-  SERVICE_NAME: evo-docs
+  SERVICE_NAME: platform-docs-hub
 
 jobs:
   build-and-deploy:
@@ -812,7 +870,7 @@ jobs:
       contents: read
       id-token: write
     env:
-      REPO: europe-north1-docker.pkg.dev/platform-dev-p01/evo-docs/evo-docs
+      REPO: europe-west3-docker.pkg.dev/platform-dev-p01/evo-images/platform-docs-hub
 
     steps:
       - name: Checkout hub repo
@@ -857,12 +915,12 @@ jobs:
           service_account: ${{ secrets.GCP_SA }}
 
       - name: Configure Docker
-        run: gcloud auth configure-docker europe-north1-docker.pkg.dev
+        run: gcloud auth configure-docker europe-west3-docker.pkg.dev
 
       - name: Build and push Docker image
         run: |
           IMAGE_TAG="${REPO}:${GITHUB_SHA::7}"
-          docker build -t "$IMAGE_TAG" .
+          docker build --platform linux/amd64 -t "$IMAGE_TAG" .
           docker push "$IMAGE_TAG"
 
       - name: Deploy to Cloud Run
@@ -882,7 +940,7 @@ jobs:
 ### 2.11 `.gitignore`
 
 ```
-_sources/
+sources/
 site/
 __pycache__/
 *.pyc
@@ -891,10 +949,12 @@ __pycache__/
 
 ### 2.12 GitHub Secrets to Configure
 
+> **Note:** No secrets are configured yet — the current deploy is manual (`gh auth token` sourced at build time from the local machine, not via GitHub Actions). These will be wired up when the Cloud Run CI pipeline in §2.10 lands.
+
 | Secret | Value | Where to Get It |
 |--------|-------|----------------|
-| `WIF_PROVIDER` | Workload Identity Federation provider string | Output of §1.4 — `projects/.../providers/evo-docs-provider` |
-| `GCP_SA` | `evo-docs-ci@platform-dev-p01.iam.gserviceaccount.com` | Created in §1.4 |
+| `WIF_PROVIDER` | Workload Identity Federation provider string | Output of §1.4 — `projects/.../providers/platform-docs-hub-provider` |
+| `GCP_SA` | `platform-docs-hub-ci@platform-dev-p01.iam.gserviceaccount.com` | Created in §1.4 |
 | `DOCS_APP_ID` | GitHub App ID | Create a GitHub App (see §2.13) |
 | `DOCS_APP_PRIVATE_KEY` | GitHub App private key | From the GitHub App settings |
 
@@ -907,7 +967,7 @@ The CI pipeline needs read access to all doc-source repos. A GitHub App is the r
 1. **Create a GitHub App:**
    - Go to `https://github.com/organizations/PricerAB/settings/apps/new`
    - Name: `Pricer Docs Aggregator`
-   - Homepage URL: `https://github.com/PricerAB/evo-docs`
+   - Homepage URL: `https://github.com/PricerAB/platform-docs-hub`
    - Uncheck "Active" under Webhook (no webhook needed)
    - Permissions: **Repository → Contents → Read-only**
    - Where can this app be installed? **Only on this account**
@@ -919,7 +979,7 @@ The CI pipeline needs read access to all doc-source repos. A GitHub App is the r
    - Choose "Install" next to the app
    - Select **All repositories** (or select specific doc-source repos)
 
-4. **Add secrets to evo-docs repo:**
+4. **Add secrets to platform-docs-hub repo:**
    - `DOCS_APP_ID` → App ID (from app settings)
    - `DOCS_APP_PRIVATE_KEY` → The full private key content
 
@@ -973,10 +1033,11 @@ Use this template:
 
 ## How to run locally
 
-```bash
+\`
+``bash
 ./gradlew quarkusDev   # If Java
 npm run dev            # If Node.js
-```
+\```
 
 ## Architecture
 
@@ -1030,14 +1091,14 @@ jobs:
 
 #### Step 5: Register in the hub
 
-Add the repo name to `evo-docs/repos.txt`:
+Add the repo name to `platform-docs-hub/repos.txt`:
 
 ```bash
-# In the evo-docs repo:
+# In the platform-docs-hub repo:
 echo "my-new-service" >> repos.txt
 
 # If the repo needs a custom category label, add it to:
-# evo-docs/scripts/generate-nav.py → CATEGORY_MAP
+# platform-docs-hub/scripts/generate-nav.py → CATEGORY_MAP
 ```
 
 Commit and push — the next daily build (or manual trigger) will include the new docs.
@@ -1045,7 +1106,7 @@ Commit and push — the next daily build (or manual trigger) will include the ne
 #### Step 6: Verify
 
 ```bash
-# In evo-docs, run locally:
+# In platform-docs-hub, run locally:
 ./scripts/sync-repos.sh
 mkdocs serve
 # Open http://localhost:8000 and verify the new service appears
@@ -1099,7 +1160,7 @@ EOF
 
 # 3. Commit
 git add docs/ mkdocs.yml
-git commit -m "docs: add minimal docs for evo-docs hub"
+git commit -m "docs: add minimal docs for platform-docs-hub"
 git push
 ```
 
@@ -1147,7 +1208,7 @@ Create `.github/workflows/docs-check.yml` (same as §3.1 Step 4).
 #### Step 5: Register in the hub
 
 ```bash
-# In evo-docs:
+# In platform-docs-hub:
 echo "my-existing-repo" >> repos.txt
 git add repos.txt
 git commit -m "docs: register my-existing-repo in doc hub"
@@ -1156,7 +1217,7 @@ git commit -m "docs: register my-existing-repo in doc hub"
 #### Step 6: Add to `generate-nav.py`
 
 ```python
-# In evo-docs/scripts/generate-nav.py, add to CATEGORY_MAP:
+# In platform-docs-hub/scripts/generate-nav.py, add to CATEGORY_MAP:
 "my-existing-repo": {
     "section": "Services",         # or "Consumer Apps", "Infrastructure", etc.
     "label": "My Service Label",   # Display name on the docs site
@@ -1187,6 +1248,8 @@ git push origin main
 ```
 
 ### 4.4 Adopting `Replatforming/onboarding/` (local docs → GitHub repo)
+
+> **Status: ADOPTED.** This folder was successfully moved into `PricerAB/replatforming-onboarding` and is one of the two live source repos on the hub (24 .md files). Use this procedure as a reference when onboarding the remaining backlog of consumer-app and service repos.
 
 This folder contains 17+ comprehensive onboarding docs. It needs to become a tracked GitHub repo:
 
@@ -1253,10 +1316,10 @@ git push -u origin main
 ### 5.1 Adding a New Doc-Source Repo
 
 1. **The repo must have `docs/` with at least `docs/index.md`** (see §3 or §4)
-2. **Add the repo name to `evo-docs/repos.txt`:**
+2. **Add the repo name to `platform-docs-hub/repos.txt`:**
 
 ```bash
-cd evo-docs
+cd platform-docs-hub
 echo "new-repo-name" >> repos.txt
 ```
 
@@ -1285,11 +1348,11 @@ git commit -m "docs: add new-repo-name to doc hub"
 git push
 ```
 
-The next daily build (or manual workflow trigger) will pick it up. To deploy immediately: go to GitHub → Actions → Build & Deploy Docs → Run workflow.
+Until the CI pipeline (§6) is wired up to Cloud Run, deploy with the local one-liner from [27 §7](27-hub-operations-guide.md#7-build-command-one-liner-copy-paste-ready).
 
 ### 5.2 Removing a Doc-Source Repo
 
-1. **Remove the repo from `evo-docs/repos.txt`** (delete the line or comment it out with `#`)
+1. **Remove the repo from `platform-docs-hub/repos.txt`** (delete the line or comment it out with `#`)
 2. **Remove the category mapping** from `scripts/generate-nav.py` (optional — it will just be unused)
 3. **Commit and push**
 
@@ -1391,6 +1454,8 @@ on:
 
 ## 7. Maintenance Procedures
 
+> **For day-to-day operations — caching gotchas (Docker, Artifact Registry, browser), the local build/deploy one-liner, and "I don't see my changes" troubleshooting — see [27 — Operations Guide](27-hub-operations-guide.md).** This section covers the scheduled maintenance procedures.
+
 ### 7.1 Daily Maintenance (Automated)
 
 The daily CI build handles:
@@ -1400,9 +1465,13 @@ The daily CI build handles:
 
 If the daily build fails, GitHub Actions sends a notification. Check the logs for the failing step.
 
+> **Note:** As of 2026-07-07 the daily CI build is not yet wired up (§2.10 still targets Pages). Until that's fixed, "freshness" relies on manual rebuilds. Trigger a rebuild with the local one-liner in [27 §7](27-hub-operations-guide.md#7-build-command-one-liner-copy-paste-ready) when you know a source repo has changed.
+
 ### 7.2 Weekly Maintenance — Stale Content Detection (Automated)
 
-Add this GitHub Actions workflow to `evo-docs` to automatically flag docs that haven't been updated in 90+ days. It runs every Monday morning and creates an issue if any pages are stale.
+Add this GitHub Actions workflow to `platform-docs-hub` to automatically flag docs that haven't been updated in 90+ days. It runs every Monday morning and creates an issue if any pages are stale.
+
+> **Note:** Workflow drafted but **not yet added** to the repo. See [26 §Remaining Work](26-platform-docs-hub-implementation-report.md) — listed as "Stale content detection (Low)" priority.
 
 `.github/workflows/detect-stale-docs.yml`:
 
@@ -1439,8 +1508,8 @@ jobs:
           echo "Checking for docs unchanged since $(date -d '90 days ago' '+%Y-%m-%d')..."
           > stale-report.txt
 
-          # Scan _sources/ (cloned repos) + docs/ (hub pages)
-          for dir in _sources docs; do
+          # Scan sources/ (cloned repos) + docs/ (hub pages)
+          for dir in sources docs; do
             find "$dir" -name '*.md' -type f 2>/dev/null | while read file; do
               # Get last Git commit date for this file
               LAST_MODIFIED=$(git log -1 --format=%ct -- "$file" 2>/dev/null)
@@ -1483,7 +1552,7 @@ jobs:
 **What it does:**
 - Runs every Monday at 9am UTC
 - Clones all doc-source repos via `sync-repos.sh`
-- Scans every `.md` file under `_sources/` and `docs/`
+- Scans every `.md` file under `sources/` and `docs/`
 - Flags files whose last Git commit was >90 days ago
 - Creates a single GitHub issue listing all stale pages, tagged `stale-content`
 - If no stale pages found, exits silently
@@ -1493,17 +1562,17 @@ jobs:
 ```bash
 # Alternative: use file mtime instead of git log (works with shallow clones)
 CUTOFF_TIMESTAMP=$(date -d '90 days ago' +%s)
-find _sources docs -name '*.md' -type f -newermt '90 days ago' -print  # find fresh files
+find sources docs -name '*.md' -type f -newermt '90 days ago' -print  # find fresh files
 ```
 
 ### 7.3 Weekly Maintenance (Manual — 5 minutes)
 
 ```bash
-cd evo-docs
+cd platform-docs-hub
 
 # 1. Check for new repos in the org that might need docs
 gh repo list PricerAB --limit 100 --json name --jq '.[].name' > /tmp/all-repos.txt
-grep -v -f repos.txt /tmp/all-repos.txt | grep -v "^evo-docs$" > /tmp/missing-from-docs.txt
+grep -v -f repos.txt /tmp/all-repos.txt | grep -v "^platform-docs-hub$" > /tmp/missing-from-docs.txt
 echo "Repos not in docs hub:"
 cat /tmp/missing-from-docs.txt
 
@@ -1518,7 +1587,7 @@ while IFS= read -r repo; do
 done < repos.txt
 
 # 3. Verify the deployed site is healthy
-curl -sI "https://evo-docs-xxxxx-oc.a.run.app" | head -1
+curl -sI "https://platform-docs-hub-990006507229.europe-north1.run.app" | head -1
 # Should return: HTTP/2 200
 ```
 
@@ -1531,23 +1600,24 @@ mkdocs build --strict  # Verify nothing breaks with the new version
 
 # 2. Audit cross-repo links
 # Install lychee: brew install lychee
-lychee --base docs.pricer.com site/ 2>&1 | tee link-audit.txt
+lychee --base docs.pricer-plaza.com site/ 2>&1 | tee link-audit.txt
 # Review broken links and fix in source repos
 
-# 3. Review IAP access list
-gcloud iap web get-iam-policy \
-  --resource-type=backend-services \
-  --project=platform-dev-p01
+# 3. Review IAP access list (DEFERRED — site is currently public)
+# gcloud iap web get-iam-policy \
+#   --resource-type=backend-services \
+#   --project=platform-dev-p01
 # Verify only @pricer.com accounts have access
 
 # 4. Rotate GitHub App private key (every 6 months or per security policy)
 # Generate new key in GitHub App settings → update DOCS_APP_PRIVATE_KEY secret
+# (DEFERRED until §2.13 GitHub App is created)
 ```
 
 ### 7.4 Updating Dependencies
 
 ```bash
-cd evo-docs
+cd platform-docs-hub
 
 # Update mkdocs and plugins
 pip install --upgrade mkdocs-material pymdown-extensions
@@ -1567,7 +1637,7 @@ git push
 
 ### 7.5 Managing IAP Access
 
-> **Note:** These commands require a Serverless NEG + load balancer to be set up (see §1.7). Until then, manage access via the Cloud Console: **Cloud Run → evo-docs → Security.**
+> **Note:** IAP is not yet enabled (the hub runs publicly with `--allow-unauthenticated`). These commands require a Serverless NEG + load balancer to be set up (see §1.7). Once IAP is wired up, manage access here:
 
 ```bash
 # Grant access to a specific user
@@ -1604,17 +1674,17 @@ If a deployment breaks the site:
 ```bash
 # 1. List recent revisions
 gcloud run revisions list \
-  --service=evo-docs \
+  --service=platform-docs-hub \
   --region=europe-north1 \
   --project=platform-dev-p01
 
 # 2. Roll back to the previous revision
-gcloud run services update-traffic evo-docs \
+gcloud run services update-traffic platform-docs-hub \
   --region=europe-north1 \
   --project=platform-dev-p01 \
   --to-revisions=<REVISION_NAME>=100
 
-# 3. Fix the issue in evo-docs and push
+# 3. Fix the issue in platform-docs-hub and push
 ```
 
 ---
@@ -1632,6 +1702,8 @@ Three paths for different types of contributors. The principle: no one should ne
 5. CI runs `mkdocs build --strict` — fails if links are broken
 6. CODEOWNERS auto-assigns the service owner for review
 7. After approval → merge. Daily hub rebuild picks up the change.
+
+> **Until CI wires up to Cloud Run:** changes don't auto-deploy. Whoever merges the PR triggers a manual rebuild via the local one-liner in [27 §7](27-hub-operations-guide.md#7-build-command-one-liner-copy-paste-ready).
 
 ### Scenario B: Non-technical contributor (PM, designer, support)
 
@@ -1660,12 +1732,12 @@ No local Git, no clone, no terminal. Just a browser.
 
 ### Scenario C: Brand-new service docs
 
-1. Copy the template from `evo-docs/templates/repo-docs-template/` (to be created in Phase 3 — for now, use the manual steps in [§3.1](#31-step-by-step))
+1. Copy the template from `platform-docs-hub/templates/repo-docs-template/` (to be created in Phase 3 — for now, use the manual steps in [§3.1](#31-step-by-step))
 2. Fill in `docs/index.md` (what/why/how — see [§3.1 Step 2](#step-2-write-docsindexmd))
 3. Add `mkdocs.yml` with minimal config
 4. Commit to `main`
-5. Add the repo name to `evo-docs/repos.txt`
-6. Add category mapping in `evo-docs/scripts/generate-nav.py` → `CATEGORY_MAP`
+5. Add the repo name to `platform-docs-hub/repos.txt`
+6. Add category mapping in `platform-docs-hub/scripts/generate-nav.py` → `CATEGORY_MAP`
 7. Next hub rebuild auto-includes the new service
 
 ### Quick Reference: Which Path to Use
@@ -1681,6 +1753,8 @@ No local Git, no clone, no terminal. Just a browser.
 
 ## 8. Troubleshooting
 
+> **Day-to-day caching issues** ("I rebuilt but I don't see my changes") are covered in [27 §2](27-hub-operations-guide.md). This section covers the build-pipeline issues from the implementation history and the §1-§7 procedures.
+
 ### 8.1 "sync-repos.sh: Permission denied (publickey)"
 
 **Cause:** GitHub App token not available or expired.
@@ -1689,6 +1763,8 @@ No local Git, no clone, no terminal. Just a browser.
 1. Check that `DOCS_APP_ID` and `DOCS_APP_PRIVATE_KEY` secrets exist in the repo
 2. Verify the GitHub App is still installed on PricerAB
 3. Regenerate the private key if expired
+
+> **Note:** Until the CI pipeline wires up the GitHub App, source clones use `gh auth token` from the local machine (passed via `--build-arg GITHUB_TOKEN`). If a local build fails with permission errors, run `gh auth status` first.
 
 ### 8.2 "Repo not found" for a source repo
 
@@ -1704,18 +1780,20 @@ No local Git, no clone, no terminal. Just a browser.
 
 **Fix:**
 1. Read the error output — it says exactly which file has a broken link
-2. Fix the link in the source repo (not in `evo-docs`)
+2. Fix the link in the source repo (not in `platform-docs-hub`)
 3. The next build will pick up the fix
 
 ### 8.4 "Nav marker not found" in generate-nav.py
 
-**Cause:** The marker comment was removed from `mkdocs.yml`.
+**Cause:** The marker comment was removed from `mkdocs.yml`, or its text drifted from `NAV_MARKER` in `generate-nav.py`.
 
 **Fix:**
 Ensure `mkdocs.yml` has this line exactly:
 ```yaml
-# REST OF NAV IS AUTO-GENERATED FROM _sources/
+# REST OF NAV IS AUTO-GENERATED FROM sources/
 ```
+
+And that `NAV_MARKER` in `scripts/generate-nav.py` matches (currently `# REST OF NAV IS AUTO-GENERATED FROM sources/`).
 
 ### 8.5 Build succeeds but new docs don't appear
 
@@ -1738,12 +1816,60 @@ gcloud iap web add-iam-policy-binding \
   --project=platform-dev-p01
 ```
 
+> **Note:** IAP is not yet enabled. The hub currently runs with `--allow-unauthenticated`. This section is a forward reference for when IAP is wired up.
+
 ### 8.7 Docker build fails with "COPY failed: file not found"
 
 **Cause:** `mkdocs build` didn't produce a `site/` directory (build step failed).
 
 **Fix:**
 Run `mkdocs build` locally with `--verbose` to see the real error. Usually a broken link or missing file in one of the cloned source repos.
+
+### 8.8 Docker build fails with "/bin/sh: ./scripts/sync-repos.sh: not found"
+
+**Cause:** Alpine's base image ships only `ash`, not `bash`. `sync-repos.sh` uses `#!/bin/bash` and bashisms (`[[ ... ]]`).
+
+**Fix:** Already fixed in the live `Dockerfile` (§2.8) via `RUN apk add --no-cache bash git`. If you copy the Dockerfile from elsewhere, make sure the `apk add` line is present. See [26 §Attempt 3](26-platform-docs-hub-implementation-report.md).
+
+### 8.9 `gcloud run deploy` fails: "Container manifest type must support amd64/linux"
+
+**Cause:** Docker on Apple Silicon builds ARM64 images by default; Cloud Run requires amd64.
+
+**Fix:** Always pass `--platform linux/amd64` to `docker build`:
+```bash
+docker build --platform linux/amd64 ...
+```
+See [26 §Attempt 4](26-platform-docs-hub-implementation-report.md).
+
+### 8.10 Landing page renders but every sidebar link returns 404
+
+**Cause:** Source repos were cloned into `docs/_sources/` (underscore prefix). Web servers including nginx treat underscore-prefixed directories as hidden/internal and refuse to serve files from them — even though the HTML is on disk.
+
+**Fix:** Rename `_sources` → `sources` everywhere: in `sync-repos.sh` (`SOURCES_DIR="sources"`), in `generate-nav.py` (`SOURCES_DIR = "sources"` + nav marker), and in the `mkdocs.yml` marker comment. See [26 §Attempt 5](26-platform-docs-hub-implementation-report.md).
+
+### 8.11 One repo's links work but another's 404 (mixed results)
+
+**Cause:** `rewrite_paths()` in `generate-nav.py` doesn't prepend `docs/` when a per-repo `mkdocs.yml` nav entry uses bare filenames (e.g., `00-foo.md` instead of `docs/00-foo.md`).
+
+**Fix:** Already fixed in the live script — `rewrite_paths()` checks whether the path starts with `docs/` and prepends it if missing. If you regenerate the script, preserve that branch. See [26 §Attempt 6](26-platform-docs-hub-implementation-report.md).
+
+### 8.12 Landing page card links 404 even though the sidebar links work
+
+**Cause:** The landing page (`docs/index.md`) used hardcoded "pretty" paths (`platform/overview/`, `services/index/`) that don't correspond to the actual file structure under `sources/<repo>/docs/`.
+
+**Fix:** Update landing page links to point to actual source paths (e.g., `sources/evo-dtoflow-protos/docs/index.md`). See [26 §Attempt 7](26-platform-docs-hub-implementation-report.md).
+
+### 8.13 A card link 404s because the source repo has no `docs/index.md`
+
+**Cause:** The source repo's docs start at numbered files (`00-foo.md`) — there's no `index.md` for the section to land on.
+
+**Fix:** Either create `docs/index.md` in the source repo with a brief overview, or update the landing page card to link directly to the first numbered file. See [26 §Attempt 8](26-platform-docs-hub-implementation-report.md).
+
+### 8.14 GitHub Pages deploy fails with HTTP 422
+
+**Cause:** The PricerAB GitHub organization has Pages creation **disabled at the org level**. No repo in the org can use GitHub Pages — `gh api repos/PricerAB/<repo>/pages -X POST` returns 422.
+
+**Fix:** Don't use GitHub Pages. Deploy to Cloud Run instead (which is what the live hub does). See [26 §Attempt 2](26-platform-docs-hub-implementation-report.md).
 
 ---
 
@@ -1753,24 +1879,32 @@ Run `mkdocs build` locally with `--verbose` to see the real error. Usually a bro
 
 ```bash
 # Hub repo — local development
-cd evo-docs
+cd platform-docs-hub
 ./scripts/sync-repos.sh        # Clone all source repos
 mkdocs serve                    # Local preview at http://localhost:8000
 mkdocs build --strict           # Build with link checking
 
-# Hub repo — deploy manually
-git push                        # Triggers CI deploy
-# OR: GitHub Actions → Build & Deploy Docs → Run workflow
+# Hub repo — deploy manually (current flow; CI not yet wired)
+# Full one-liner in 27 §7; abbreviated:
+docker build --no-cache --platform linux/amd64 \
+  --build-arg GITHUB_TOKEN="$(gh auth token)" \
+  -t europe-west3-docker.pkg.dev/platform-dev-p01/evo-images/platform-docs-hub:latest .
+docker push europe-west3-docker.pkg.dev/platform-dev-p01/evo-images/platform-docs-hub:latest
+gcloud run deploy platform-docs-hub \
+  --image=europe-west3-docker.pkg.dev/platform-dev-p01/evo-images/platform-docs-hub:latest \
+  --region=europe-north1 --platform=managed --allow-unauthenticated \
+  --memory=256Mi --cpu=1 --min-instances=0 --max-instances=3 --concurrency=80 \
+  --project=platform-dev-p01
 
 # GCP — check deployment
-gcloud run services describe evo-docs \
+gcloud run services describe platform-docs-hub \
   --region=europe-north1 \
   --project=platform-dev-p01 \
   --format='value(status.url)'
 
 # GCP — view logs
 gcloud logging read \
-  "resource.type=cloud_run_revision AND resource.labels.service_name=evo-docs" \
+  "resource.type=cloud_run_revision AND resource.labels.service_name=platform-docs-hub" \
   --project=platform-dev-p01 \
   --limit=10
 
@@ -1799,24 +1933,94 @@ git add repos.txt && git commit -m "docs: remove stale-repo" && git push
 When setting up the platform, create these files in order:
 
 - [ ] GCP: APIs enabled (§1.2)
-- [ ] GCP: Artifact Registry repo (§1.3)
-- [ ] GCP: Workload Identity Federation (§1.4)
+- [ ] GCP: Artifact Registry repo (§1.3) — note `europe-west3` not `europe-north1`
+- [ ] GCP: Workload Identity Federation (§1.4) — **DEFERRED until CI pipeline wires up**
 - [ ] GCP: Initial Cloud Run deploy (§1.5)
-- [ ] GCP: IAP enabled (§1.6)
-- [ ] GitHub: App created and installed (§2.13)
-- [ ] GitHub: Secrets added to evo-docs (§2.12)
-- [ ] `evo-docs/mkdocs.yml` (§2.2)
-- [ ] `evo-docs/docs/index.md` (§2.3)
-- [ ] `evo-docs/requirements.txt` (§2.4)
-- [ ] `evo-docs/scripts/sync-repos.sh` (§2.5)
-- [ ] `evo-docs/scripts/generate-nav.py` (§2.6)
-- [ ] `evo-docs/repos.txt` (§2.7)
-- [ ] `evo-docs/Dockerfile` (§2.8)
-- [ ] `evo-docs/nginx.conf` (§2.9)
-- [ ] `evo-docs/.github/workflows/build-and-deploy.yml` (§2.10)
-- [ ] `evo-docs/.gitignore` (§2.11)
-- [ ] Push evo-docs → verify CI deploy succeeds
+- [ ] GCP: IAP enabled (§1.6) — **DEFERRED until custom domain lands**
+- [ ] GitHub: App created and installed (§2.13) — **DEFERRED until CI pipeline wires up**
+- [ ] GitHub: Secrets added to platform-docs-hub (§2.12) — **DEFERRED**
+- [ ] `platform-docs-hub/mkdocs.yml` (§2.2)
+- [ ] `platform-docs-hub/docs/index.md` (§2.3)
+- [ ] `platform-docs-hub/requirements.txt` (§2.4)
+- [ ] `platform-docs-hub/scripts/sync-repos.sh` (§2.5)
+- [ ] `platform-docs-hub/scripts/generate-nav.py` (§2.6)
+- [ ] `platform-docs-hub/repos.txt` (§2.7)
+- [ ] `platform-docs-hub/Dockerfile` (§2.8) — includes `apk add bash git`
+- [ ] `platform-docs-hub/nginx.conf` (§2.9)
+- [ ] `platform-docs-hub/.github/workflows/build-and-deploy.yml` (§2.10) — **NOT YET targeting Cloud Run**
+- [ ] `platform-docs-hub/.gitignore` (§2.11) — note `sources/` not `_sources/`
+- [ ] Push platform-docs-hub → manually deploy via local one-liner
 - [ ] First source repo added → verify it appears on the site
+
+---
+
+## 10. Changelog vs. plan
+
+This guide was drafted 2026-06-30 against an idealized design. Reality landed differently in several places. This section is the canonical delta — if you're reading §1-§9 and they don't match what you see in production, **start here**.
+
+### 10.1 What was built vs. what was drafted
+
+| Area | Drafted (§1-§9) | As-built (live 2026-07-07) | Why it changed |
+|:---|:---|:---|:---|
+| Hub repo name | `PricerAB/evo-docs` | `PricerAB/platform-docs-hub` | Renamed when we discovered `evo-docs` was already used semantically in the org |
+| Source dir | `docs/_sources/<repo>/` | `docs/sources/<repo>/` | nginx (and most CDNs) silently 404 underscore-prefixed directories — see [26 §Attempt 5](26-platform-docs-hub-implementation-report.md) |
+| Hosting | GitHub Pages + IAP | Cloud Run + public (`--allow-unauthenticated`) | PricerAB org has Pages creation disabled org-wide (HTTP 422); IAP requires Serverless NEG + load balancer — deferred |
+| Artifact Registry region | `europe-north1-docker.pkg.dev/.../evo-docs/...` | `europe-west3-docker.pkg.dev/platform-dev-p01/evo-images/...` | Reused existing `evo-images` registry instead of creating a new one |
+| Cloud Run service name | `evo-docs` | `platform-docs-hub` | Aligned with the repo rename |
+| Cloud Run region | (not specified) | `europe-north1` | Aligned with the rest of the platform |
+| Cloud Run URLs | (single URL assumed) | Two URLs: `platform-docs-hub-990006507229.europe-north1.run.app` (primary, current project) + `platform-docs-hub-yrwyrs6axa-lz.a.run.app` (legacy, from previous project) | Service annotation has both; legacy URL still serves the same service |
+| Cloud Run deploy flags | (assumed full set) | `--memory=256Mi --cpu=1 --concurrency=80 --timeout=300`; **no** `--min-instances` (defaults to 0) or `--max-instances` (capped at 3 via revision template annotation) | Matched actual `gcloud run services describe` output |
+| Cloud Run service account | (not specified) | Default compute SA `990006507229-compute@developer.gserviceaccount.com` | No custom SA created — fine because service is public and uses default compute identity |
+| Cloud Run revisions | "4 commits" implied | 14 revisions, active `00014-6nv` | Manual rebuilds over multiple days since the report |
+| Image flags | (not specified) | `docker build --platform linux/amd64` | Apple Silicon builds ARM by default; Cloud Run requires amd64 — see [26 §Attempt 4](26-platform-docs-hub-implementation-report.md) |
+| Dockerfile `apk add` | (not specified) | `apk add --no-cache git openssh-client bash` | `sync-repos.sh` uses bashisms and `git`; Alpine ships only `ash` — see [26 §Attempt 3](26-platform-docs-hub-implementation-report.md) |
+| Dockerfile sync step | Expected `sync-repos.sh` to run *before* `docker build` | Runs **inside** `docker build` (line 14 of live Dockerfile) | Self-contained image — no external dependency at build-host time |
+| Theme palette | indigo / indigo | **teal / teal** with Inter (text) + JetBrains Mono (code), custom dark/light icons | Impeccable-inspired branding |
+| `repos.txt` format | Bare repo names (`evo-dtoflow-protos`) | Org-prefixed (`PricerAB/evo-dtoflow-protos`) | Should be normalized — `sync-repos.sh` hardcodes `GITHUB_ORG="PricerAB"`; either drop the prefix or remove the hardcoded org |
+| `generate-nav.py` path rewrite | Always prepends `sources/<repo>/` | Same, but also prepends `docs/` when missing | Per-repo nav entries like `00-foo.md` need `docs/` prepended or links 404 — see [26 §Attempt 6](26-platform-docs-hub-implementation-report.md) |
+| Landing page links | Hardcoded "pretty" paths (`platform/overview/`) | Direct paths to actual `.md` files (`sources/evo-dtoflow-protos/docs/...`) | Hardcoded paths didn't match the cloned structure — see [26 §Attempt 7](26-platform-docs-hub-implementation-report.md) |
+| Onboarding `docs/index.md` | Assumed to exist | Created during adoption | Original repo's files started at `00-...md`; no index — see [26 §Attempt 8](26-platform-docs-hub-implementation-report.md) |
+| Source repos registered | 17 in `repos.txt` | 2 live (`evo-dtoflow-protos`, `replatforming-onboarding`); 15 still in adoption backlog | Rest need `docs/` + `mkdocs.yml` first; not done yet |
+| CI/CD pipeline | GitHub Actions → Cloud Run via WIF + GitHub App | Workflow file present but still targets GitHub Pages (broken) | WIF / GitHub App wiring deferred; deploys currently manual via local `docker build && docker push && gcloud run deploy` |
+| Auth | IAP via `domain:pricer.com` | Public, `--allow-unauthenticated` | IAP deferred until custom domain lands |
+| WIF / service account | `evo-docs-ci` SA, `evo-docs-provider` WIF | Same names drafted but never created | Deferred with the rest of the CI work |
+
+### 10.2 Status of each section
+
+| Section | Status | Notes |
+|:---|:---|:---|
+| §1 Infrastructure setup | Partial | GCP project + Artifact Registry + initial Cloud Run deploy work; IAP, DNS, WIF deferred |
+| §2 Hub repo files | Live, with one caveat | All files exist and work; CI workflow still targets Pages |
+| §3 New repo with docs | Live | Template works, no adoption backlog entries yet |
+| §4 Existing repo adoption | 2 of ~17 done | `evo-dtoflow-protos` and `replatforming-onboarding` are live; rest pending |
+| §5 Add/remove from hub | Live, manual | Works end-to-end via `repos.txt` + `CATEGORY_MAP`; deploy is local not CI |
+| §6 CI/CD pipeline | Drafted only | Workflow file present but broken (still deploys to Pages); manual deploy is the current path |
+| §7 Maintenance procedures | Live (some scripts) | Stale-content detection workflow drafted but not added yet; manual checks are described |
+| §8 Troubleshooting | Live + extended | Covers the 8 issues from the implementation report |
+| §9 Contribution workflows | Live | All three scenarios (developer, non-technical, brand-new service) work today |
+
+### 10.3 Open work, in priority order
+
+| Priority | Item | What's missing |
+|:---:|:---|:---|
+| High | Fix CI to deploy to Cloud Run | §2.10 workflow file still references Pages. Switch to `google-github-actions/deploy-cloudrun@v2`, wire up WIF (§1.4) and GitHub App (§2.13) |
+| High | Stop using `--allow-unauthenticated` before any sensitive content lands | Either keep docs public-safe, or implement IAP (§1.6) |
+| Medium | Adopt the 15 backlog repos | See backlog list in §2.7 |
+| Medium | Custom domain `docs.pricer-plaza.com` | Load balancer + IAP + DNS (§1.7) |
+| Low | Resolve legacy URL `platform-docs-hub-yrwyrs6axa-lz.a.run.app` | Service still serves both URLs; either remove the old domain mapping from the project or document why both are kept |
+| Low | Make `--max-instances=3` explicit in deploy command | Currently only enforced via revision template annotation; passing the flag would make the cap visible at deploy time |
+| Low | Fix `repos.txt` org prefix | Live file has `PricerAB/evo-dtoflow-protos` but `sync-repos.sh` hardcodes `GITHUB_ORG="PricerAB"`. Either remove the prefix or remove the hardcoded org to avoid confusion |
+| Low | Nav title formatting | `Adr 001 Dtoflow...` → `ADR-001: DTOflow...` |
+| Low | Versioned docs (`mike` plugin) | For API versioning |
+| Low | Stale-content detection workflow | §7.2 drafted but workflow not added |
+| Low | Auto-discovery of repos with `docs/` | Replace manual `repos.txt` with GitHub API scan |
+
+### 10.4 Companion documents
+
+- **[26 — Implementation Report](26-platform-docs-hub-implementation-report.md)** — Full build history, 8 issues hit and fixed with debugging trails. **Read this if something breaks.**
+- **[27 — Operations Guide](27-hub-operations-guide.md)** — Day-to-day procedures. Caching gotchas (Docker, Artifact Registry, browser), local build & deploy one-liner, troubleshooting. **Read this if you can't see your changes.**
+
+---
 
 ## Appendix C: Pull Request Template
 
@@ -1860,7 +2064,7 @@ When setting up the platform, create these files in order:
 
 | Repo Tier | Action |
 |-----------|--------|
-| Tier 1 (evo-docs, evo-dtoflow-protos, replatforming-onboarding) | Add `.github/pull_request_template.md` immediately |
+| Tier 1 (platform-docs-hub, evo-dtoflow-protos, replatforming-onboarding) | Add `.github/pull_request_template.md` immediately |
 | Tier 2 (all Cloud Run services) | Add during Phase 3 rollout |
 | Tier 3+ | Optional — add if repo has `docs/` folder |
 
@@ -1868,4 +2072,4 @@ When setting up the platform, create these files in order:
 
 ---
 
-> **Companion docs:** [16 — Docs GitHub Strategy](16-docs-github-strategy.md) · [README](README.md)
+> **Companion docs:** [16 — Docs GitHub Strategy](16-docs-github-strategy.md) · [26 — Implementation Report](26-platform-docs-hub-implementation-report.md) · [27 — Operations Guide](27-hub-operations-guide.md)
